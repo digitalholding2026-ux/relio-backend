@@ -330,7 +330,7 @@ function tutoratForme(
         message:
           forme === null
             ? 'Ton calcul est juste ! Il reste à écrire la réponse comme la consigne le demande.'
-            : `Ton résultat est juste, mais ce n’est pas la forme demandée : il faut l’écrire sous la forme ${forme}.`,
+            : `Ton calcul est juste ! Il reste à l’écrire sous la forme ${forme}.`,
         action: 'Réécris ta réponse sous cette forme.',
         origine: 'forme',
         resume: null,
@@ -526,7 +526,7 @@ export function construireTutorat(
       message:
         nbEchecs > 0
           ? `Tu y es arrivé après ${nbEchecs === 1 ? 'un essai' : `${nbEchecs} essais`}. Voici la méthode à retenir.`
-          : 'Ta réponse est juste. Voici la méthode à retenir.',
+          : 'Bravo ! Ta réponse est juste. Voici la méthode à retenir.',
       action: 'Lis la méthode ci-dessous, puis passe à la suite.',
       origine: 'bilan',
       resume: resumePourObjectif(objectifId),
