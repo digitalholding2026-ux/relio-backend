@@ -69,6 +69,7 @@ import {
   SIGNATURE_PAR_DEFAUT,
   type SignatureErreur,
 } from './signatures.js';
+import { AIDES_PAR_SIGNATURE, aidePour } from './aides.js';
 import type { Correction, Exercice } from './types.js';
 
 /** Lecture de la spécification appliquée au cas « juste mais forme non respectée ». */
@@ -205,29 +206,28 @@ function signatureDuPiege(exercice: Exercice, valeur: Valeur): SignatureErreur |
   return null;
 }
 
+/**
+ * Explication d'une réponse fausse.
+ *
+ * Deux niveaux, du plus précis au plus prudent :
+ *
+ * 1. si la signature d'erreur est reconnue, le message parle de **cette**
+ *    erreur — c'est plus utile qu'une aide générale ;
+ * 2. sinon, le message donne la **méthode de la leçon** concernée, sans
+ *    prétendre savoir pourquoi l'élève s'est trompé.
+ *
+ * 🔒 Aucun identifiant technique ne peut apparaître ici. C'était le défaut
+ * du chantier 7.4 : le filet de sécurité affichait
+ * « Reprends la méthode de OO-L1-2 sur un exemple plus simple », où
+ * `OO-L1-2` est une clé de correspondance, pas une explication.
+ * `test/aides.test.ts` verrouille cette règle.
+ */
 function explicationFausse(exercice: Exercice, signature: SignatureErreur): string {
-  switch (signature) {
-    case 'denominateur_non_reduit':
-      return 'Le calcul est bon, mais le résultat doit être réduit. On simplifie le numérateur et le dénominateur par un même nombre.';
-    case 'signe_non_reparti':
-      return "Attention au signe : il appartient au terme, pas à l'ensemble du calcul.";
-    case 'signe_non_distribue':
-      return "Le signe « − » doit être distribué à chaque terme de l'expression entre parenthèses.";
-    case 'termes_non_collectes':
-      return "Il reste des termes à regrouper : on additionne les coefficients d'un même terme.";
-    case 'non_factorise':
-      return 'Le résultat est exact, mais il est resté sous forme développée. La consigne demande une forme factorisée.';
-    case 'signe_inverse_dans_difference_carre':
-      return "Dans (a − b)(a + b), le premier facteur garde « − » et le second garde « + ».";
-    case 'carre_parfait_non_extrait':
-      return 'Un carré parfait se trouve sous la racine : il faut l\'extraire avant d\'additionner.';
-    case 'coefficient_multiplicatif_oublie':
-      return "Le coefficient devant la racine compte aussi : il faut le multiplier par la valeur extraite.";
-    case 'base_racine_erronee':
-      return 'Toutes les racines doivent se ramener à la même base avant de les additionner.';
-    default:
-      return `Reprends la méthode de ${exercice.objectifs.join(', ')} sur un exemple plus simple.`;
-  }
+  // La cause exacte est reconnue : on la nomme, sans rien inventer de plus.
+  const aide = AIDES_PAR_SIGNATURE[signature];
+  if (aide !== undefined) return aide;
+
+  return aidePour(exercice.objectifs[0] ?? '', null);
 }
 
 /**

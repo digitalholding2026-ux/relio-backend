@@ -250,8 +250,15 @@ describe('signatures d’erreur', () => {
     const correction = corrigerExercice('MVP-B1-E1', '999x + 999');
     assert.equal(correction.statut, 'fausse');
     assert.equal(correction.signatureErreur, SIGNATURE_PAR_DEFAUT);
-    // Aucune conclusion spécifique n'est tirée d'une erreur inconnue.
-    assert.match(correction.explication, /Reprends la méthode/);
+
+    // Aucune conclusion **spécifique** n'est tirée d'une erreur inconnue : le
+    // moteur ne prétend pas savoir ce qui a précisément échoué. Il donne la
+    // méthode de la leçon concernée — ici le développement — sans inventer de
+    // cause, et sans jamais afficher d'identifiant technique.
+    assert.doesNotMatch(correction.explication, /\bOO-[A-Z0-9-]+\b/);
+    assert.doesNotMatch(correction.explication, /\bMVP-[A-Z0-9-]+\b/);
+    assert.doesNotMatch(correction.explication, /\bLEC-[A-Z0-9-]+\b/);
+    assert.match(correction.explication, /distribuer/i);
   });
 
   it('renseigne toujours une explication utile', () => {
