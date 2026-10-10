@@ -8,9 +8,10 @@
     "node": ">=20"
   },
   "scripts": {
-    "dev": "tsx watch src/server.ts",
     "build": "tsc --project tsconfig.build.json",
+    "dev": "tsx watch src/server.ts",
     "start": "node dist/server.js",
+    "test": "node --import tsx --test test/*.test.ts",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
