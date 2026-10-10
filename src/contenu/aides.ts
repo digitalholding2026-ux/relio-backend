@@ -54,6 +54,15 @@ export interface AideObjectif {
   readonly exemple: string;
   /** Ce qu'il doit tenter maintenant. */
   readonly suite: string;
+  /**
+   * Question d'orientation — chantier 7.5.
+   *
+   * Elle sert de premier retour quand **aucune cause n'est reconnue** : le
+   * message doit alors poser une question à laquelle l'élève peut répondre
+   * seul, plutôt qu'affirmer une règle qu'il n'a pas encore identifiée comme
+   * étant en cause.
+   */
+  readonly question: string;
 }
 
 /**
@@ -74,6 +83,8 @@ export const AIDES_PAR_OBJECTIF: Readonly<Record<ObjectifId, AideObjectif>> = {
       'Et si un terme est soustrait, le « − » change le signe de chaque terme entre parenthèses : 3(x − 4) = 3x − 12.',
     suite:
       'Applique cette idée à ton exercice : distribue d’abord, puis regroupe les termes en x et les nombres.',
+    question:
+      'Regarde les deux termes de ton expression : qu’est-ce qui se passe quand le nombre devant la parenthèse se distribue dans chacun d’eux ?'
   },
   'OO-L1-2': {
     action:
@@ -83,6 +94,8 @@ export const AIDES_PAR_OBJECTIF: Readonly<Record<ObjectifId, AideObjectif>> = {
       'Et 4x² − 9 s’écrit (2x)² − 3², donc 4x² − 9 = (2x − 3)(2x + 3).',
     suite:
       'Cherche d’abord un nombre ou une lettre qui divise tous les termes de ton expression.',
+    question:
+      'Regarde les deux termes de ton expression : quel nombre ou quelle expression pourrait diviser chacun des termes ?'
   },
   'OO-L3-1': {
     action:
@@ -92,6 +105,8 @@ export const AIDES_PAR_OBJECTIF: Readonly<Record<ObjectifId, AideObjectif>> = {
       'De même, 147 = 49 × 3, et 49 = 7², donc √147 = 7√3.',
     suite:
       'Cherche le plus grand carré parfait qui divise le nombre sous la racine, puis simplifie toutes les racines de la même façon avant d’additionner.',
+    question:
+      'Regarde le nombre sous la racine : peut-il s’écrire comme un carré parfait multiplié par un autre nombre ?'
   },
   'OO-L5-1': {
     action:
@@ -101,6 +116,8 @@ export const AIDES_PAR_OBJECTIF: Readonly<Record<ObjectifId, AideObjectif>> = {
       'Donc 1/2 + 1/3 = 3/6 + 2/6 = 5/6.',
     suite:
       'Trouve le dénominateur commun de ton calcul, puis vérifie le signe de chaque terme avant d’additionner.',
+    question:
+      'Regarde les dénominateurs de ton calcul : par quel nombre peut-on les multiplier pour les rendre égaux ?'
   },
   'OO-L5-2': {
     action:
@@ -110,6 +127,8 @@ export const AIDES_PAR_OBJECTIF: Readonly<Record<ObjectifId, AideObjectif>> = {
       'On continue tant que le numérateur et le dénominateur ont encore un facteur commun.',
     suite:
       'Divise les deux termes de ta fraction par le même nombre, le plus grand possible.',
+    question:
+      'Regarde le numérateur et le dénominateur de ta fraction : par quel nombre could-tu les diviser tous les deux ?'
   },
 };
 
@@ -155,6 +174,87 @@ export const AIDES_PAR_SIGNATURE: Readonly<
     // l'objectif est utilisée à la place.
     undefined,
 };
+
+/**
+ * Orientations **courtes**, par signature — chantier 7.5.
+ *
+ * ## Pourquoi un second niveau de texte
+ *
+ * `AIDES_PAR_SIGNATURE` porte la règle *et* son exemple résolu. C'est le bon
+ * contenu pour une explication de deuxième tour, mais c'est **trop long pour un
+ * premier échec** : l'élève qui vient de se tromper reçoit d'emblée la méthode
+ * complète et un exemple intégralement résolu, ce qui lui fait produire une
+ * réponse apprise par cœur plutôt qu'une réponse comprise.
+ *
+ * Ces orientations font une phrase, posent une question et n'incluent **aucun
+ * exemple résolu**. Elles servent de premier retour du tutorat.
+ *
+ * Règles tenues ici, identiques au reste du fichier :
+ *
+ * 1. aucun identifiant technique ;
+ * 2. **une question orientée**, à laquelle l'élève peut répondre seul ;
+ * 3. **aucun exemple résolu** — c'est ce que le niveau 2 apporte ;
+ * 4. **aucune cause affirmée** quand la signature ne le permet pas.
+ */
+export const ORIENTATIONS_PAR_SIGNATURE: Readonly<
+  Partial<Record<SignatureErreur, string>>
+> = {
+  denominateur_non_reduit:
+    'Le résultat doit être simplifié avant d’être rendu. Regarde les deux termes de ta fraction : ont-ils encore un facteur commun ?',
+  signe_non_reparti:
+    'Le signe change selon le terme qu’il précède. Vérifie le signe de chaque terme séparément.',
+  signe_non_distribue:
+    'As-tu distribué le signe « − » dans chaque terme entre parenthèses ? Que devient un terme précédé du « − » ?',
+  termes_non_collectes:
+    'As-tu regroupé tous les termes qui portent la même lettre ? Il reste peut-être des termes à additionner.',
+  non_factorise:
+    'Regarde les deux termes de ton expression : existe-t-il un nombre ou une lettre qui divise les deux ?',
+  signe_inverse_dans_difference_carre:
+    'Dans les deux facteurs, quel est le signe du premier ? Le second doit-il porter le même signe ?',
+  carre_parfait_non_extrait:
+    'Le nombre sous la racine contient-il un carré parfait ? Essaie de le trouver avant de simplifier.',
+  coefficient_multiplicatif_oublie:
+    'Le nombre écrit devant la racine compte aussi : que se passe-t-il quand il est multiplié par ce que tu extrais ?',
+  base_racine_erronee:
+    'Tes racines portent-elles sur le même nombre sous le signe radical ? Simplifie chacune avant d’additionner.',
+  hors_perimetre:
+    // Volontairement absent : cause inconnue. Le tutorat retombe alors sur
+    // l'orientation de l'objectif, sans inventer de diagnostic.
+    undefined,
+};
+
+/**
+ * Orientation courte pour un objectif, sans cause affirmée.
+ *
+ * Elle reprend `action` — phrase actionnable déjà rédigée — et y ajoute une
+ * question. Elle n'utilise **ni** `exemple` **ni** `suite` : ce sont les
+ * contenus des niveaux 2 et 3.
+ */
+export function orientationPourObjectif(objectifId: string): string {
+  const correspondance = AIDES_PAR_OBJECTIF[objectifId as ObjectifId];
+  if (!correspondance) {
+    return (
+      'Reprends l’exercice étape par étape : écris chaque transformation sur une ligne ' +
+      'et vérifie le résultat avant de passer à la suivante.'
+    );
+  }
+  return correspondance.action;
+}
+
+/**
+ * Question d'orientation pour un objectif.
+ *
+ * Premier retour du tutorat quand aucune cause n'est reconnue. Elle est
+ * volontairement **seule** : énoncer la règle *et* la question exceederait la
+ * consigne de brièveté du premier échec, et l'élève n'aurait plus à chercher.
+ */
+export function questionPourObjectif(objectifId: string): string {
+  const correspondance = AIDES_PAR_OBJECTIF[objectifId as ObjectifId];
+  if (!correspondance) {
+    return 'Peux-tu écrire chaque transformation de ton calcul sur une ligne séparée ?';
+  }
+  return correspondance.question;
+}
 
 /**
  * Message d'aide pour un exercice et une signature.

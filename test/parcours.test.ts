@@ -629,3 +629,288 @@ describe('POST /api/v1/progression', () => {
     assert.equal(nonTeste.sansDonnee, true);
   });
 });
+// ---------------------------------------------------------------------------
+// Chantier 7.5 — tutorat et suivi
+// ---------------------------------------------------------------------------
+
+describe('POST /api/v1/corrections — tutorat (7.5)', () => {
+  it('renvoie le premier niveau sans divulguer la réponse', async () => {
+    forcerSemaine(1);
+
+    const reponse = await app.inject({
+      method: 'POST',
+      url: '/api/v1/corrections',
+      payload: { exerciceId: 'MVP-B1-E1', reponse: '4x + 1' },
+    });
+
+    assert.equal(reponse.statusCode, 200);
+    const corps = reponse.json();
+    assert.equal(corps.tutorat.niveau, 1);
+    assert.equal(corps.tutorat.origine, 'signature');
+    assert.equal(corps.tutorat.resume, null, 'Pas de bilan avant d’avoir compris.');
+    assert.ok(!corps.tutorat.message.includes('2x + 1'), 'La réponse attendue est divulguée.');
+  });
+
+  it('fait progresser le niveau avec nbEchecs', async () => {
+    forcerSemaine(1);
+
+    const niveaux = [];
+    for (const nbEchecs of [0, 1, 2]) {
+      const reponse = await app.inject({
+        method: 'POST',
+        url: '/api/v1/corrections',
+        payload: { exerciceId: 'MVP-B1-E1', reponse: '4x + 1', nbEchecs },
+      });
+      niveaux.push(reponse.json().tutorat.niveau);
+    }
+
+    assert.deepEqual(niveaux, [1, 2, 3]);
+  });
+
+  it('ignore un nbEchecs aberrant sans jamais planter', async () => {
+    forcerSemaine(1);
+
+    // Valeurs inexploitables : le contexte est traité comme absent, donc premier
+    // niveau. Le serveur ne doit jamais se laisser porter par une valeur
+    //arbinaire envoyée par un client.
+    for (const valeur of [-3, 'beaucoup', null, {}]) {
+      const reponse = await app.inject({
+        method: 'POST',
+        url: '/api/v1/corrections',
+        payload: { exerciceId: 'MVP-B1-E1', reponse: '4x + 1', nbEchecs: valeur },
+      });
+      assert.equal(reponse.statusCode, 200, String(valeur));
+      assert.equal(reponse.json().tutorat.niveau, 1, String(valeur));
+    }
+  });
+
+  it('borne un nbEchecs surdimensionné au dernier niveau', async () => {
+    forcerSemaine(1);
+
+    // Un nombre aberrant mais numérique est plafonné. L'élève qui a réellement
+    // échoué autant de fois reçoit le niveau 3, jamais un niveau hors échelle.
+    const reponse = await app.inject({
+      method: 'POST',
+      url: '/api/v1/corrections',
+      payload: { exerciceId: 'MVP-B1-E1', reponse: '4x + 1', nbEchecs: 1e9 },
+    });
+
+    assert.equal(reponse.statusCode, 200);
+    assert.equal(reponse.json().tutorat.niveau, 3);
+  });
+
+  it('renvoie un bilan de méthode quand la réponse est juste', async () => {
+    forcerSemaine(1);
+
+    const reponse = await app.inject({
+      method: 'POST',
+      url: '/api/v1/corrections',
+      payload: { exerciceId: 'MVP-B1-E1', reponse: '2x + 1', nbEchecs: 2 },
+    });
+
+    const corps = reponse.json();
+    assert.equal(corps.tutorat.origine, 'bilan');
+    assert.match(corps.tutorat.message, /2 essais/);
+    assert.ok(corps.tutorat.resume && corps.tutorat.resume.length > 20);
+    assert.equal(corps.categorieDifficulte, null, 'Une réussite n’est pas une difficulté.');
+  });
+
+  it('ne renvoie aucune catégorie quand la réponse est juste', async () => {
+    // Semaine tardive : les trois blocs sont ouverts, les douze exercices
+    // sont donc tous corrigibles.
+    forcerSemaine(30);
+
+    for (const exercice of EXERCICES) {
+      const reponse = await app.inject({
+        method: 'POST',
+        url: '/api/v1/corrections',
+        payload: { exerciceId: exercice.id, reponse: exercice.reponseAttendue },
+      });
+      assert.equal(reponse.json().categorieDifficulte, null, exercice.id);
+    }
+  });
+
+  it('classe une erreur reconnue dans une catégorie nommée', async () => {
+    forcerSemaine(1);
+
+    const reponse = await app.inject({
+      method: 'POST',
+      url: '/api/v1/corrections',
+      payload: { exerciceId: 'MVP-B1-E1', reponse: '4x + 1' },
+    });
+
+    assert.equal(reponse.json().categorieDifficulte, 'oubli_de_distribuer_un_facteur');
+  });
+
+  it('classe une erreur non reconnue comme inconnue, jamais comme une cause', async () => {
+    forcerSemaine(1);
+
+    const reponse = await app.inject({
+      method: 'POST',
+      url: '/api/v1/corrections',
+      payload: { exerciceId: 'MVP-B1-E1', reponse: '999x + 999' },
+    });
+
+    assert.equal(reponse.json().categorieDifficulte, 'erreur_non_identifiee');
+  });
+
+  it('qualifie une saisie illisible sans lui attribuer de cause', async () => {
+    forcerSemaine(1);
+
+    const reponse = await app.inject({
+      method: 'POST',
+      url: '/api/v1/corrections',
+      payload: { exerciceId: 'MVP-B1-E1', reponse: '$$$' },
+    });
+
+    assert.equal(reponse.statusCode, 422);
+    const corps = reponse.json();
+    assert.equal(corps.categorieDifficulte, 'reponse_illisible');
+    assert.ok(corps.tutorat, 'Une aide doit être proposée même sur une saisie illisible.');
+    assert.doesNotMatch(corps.tutorat.message, /tu as (oublié|confondu|perdu)/i);
+  });
+
+  it('reste fermé au calendrier : le tutorat ne déverrouille aucun bloc', async () => {
+    forcerSemaine(1);
+
+    const ouvert = await app.inject({
+      method: 'POST',
+      url: '/api/v1/corrections',
+      payload: { exerciceId: 'MVP-B1-E1', reponse: '4x + 1', nbEchecs: 5 },
+    });
+    assert.equal(ouvert.statusCode, 200, 'sanité : B1 est ouvert en semaine 1');
+
+    // Un bloc encore fermé reste inaccessible, même avec un contexte d'échecs.
+    const ferme = await app.inject({
+      method: 'POST',
+      url: '/api/v1/corrections',
+      payload: { exerciceId: 'MVP-B3-E1', reponse: '1/2', nbEchecs: 5 },
+    });
+    assert.equal(ferme.statusCode, 403);
+    assert.equal(ferme.json().tutorat, undefined, 'Aucune aide n’est rendue sur un bloc fermé.');
+  });
+});
+
+describe('POST /api/v1/suivi (7.5)', () => {
+  const observation = (partiel: Record<string, unknown>) => ({
+    exerciceId: 'MVP-B1-E1',
+    rang: 1,
+    reponse: '4x + 1',
+    statut: 'fausse',
+    categorie: 'erreur_de_signe',
+    niveauAide: 1,
+    reussiteApresAides: false,
+    ...partiel,
+  });
+
+  it('agrège les observations par objectif', async () => {
+    forcerSemaine(1);
+
+    const reponse = await app.inject({
+      method: 'POST',
+      url: '/api/v1/suivi',
+      payload: {
+        observations: [
+          observation({ rang: 1 }),
+          observation({ rang: 2, statut: 'correcte', categorie: null }),
+        ],
+      },
+    });
+
+    assert.equal(reponse.statusCode, 200);
+    const corps = reponse.json();
+    const objectif = corps.objectifs.find((o: { objectifId: string }) => o.objectifId === 'OO-L1-1');
+    assert.ok(objectif);
+    assert.equal(objectif.reussisApresUnIndice, 1);
+    assert.equal(objectif.niveau, 'a_confirmer');
+  });
+
+  it('reste vide et prudent sans observation', async () => {
+    forcerSemaine(1);
+
+    const reponse = await app.inject({
+      method: 'POST',
+      url: '/api/v1/suivi',
+      payload: {},
+    });
+
+    assert.equal(reponse.statusCode, 200);
+    for (const objectif of reponse.json().objectifs) {
+      assert.equal(objectif.niveau, 'donnee_insuffisante');
+    }
+  });
+
+  it('rappelle que rien n’est conservé et qu’aucun niveau global n’est produit', async () => {
+    forcerSemaine(1);
+
+    const corps = (
+      await app.inject({ method: 'POST', url: '/api/v1/suivi', payload: {} })
+    ).json();
+
+    assert.match(corps.avertissement, /aucun niveau global/i);
+    assert.match(corps.avertissement, /maîtrise/i);
+    assert.match(corps.conservation, /Aucune donnée n’est conservée/);
+  });
+
+  it('refuse une catégorie de difficulté hors catalogue', async () => {
+    forcerSemaine(1);
+
+    const reponse = await app.inject({
+      method: 'POST',
+      url: '/api/v1/suivi',
+      payload: { observations: [observation({ categorie: 'eleve_paresseux' })] },
+    });
+
+    assert.equal(reponse.statusCode, 400);
+    assert.match(reponse.json().error.message, /Catégorie de difficulté inconnue/);
+  });
+
+  it('refuse un statut hors vocabulaire fermé', async () => {
+    forcerSemaine(1);
+
+    const reponse = await app.inject({
+      method: 'POST',
+      url: '/api/v1/suivi',
+      payload: { observations: [observation({ statut: 'non_acquis' })] },
+    });
+
+    assert.equal(reponse.statusCode, 400);
+  });
+
+  it('refuse un niveau d’aide hors {1,2,3}', async () => {
+    forcerSemaine(1);
+
+    const reponse = await app.inject({
+      method: 'POST',
+      url: '/api/v1/suivi',
+      payload: { observations: [observation({ niveauAide: 4 })] },
+    });
+
+    assert.equal(reponse.statusCode, 400);
+  });
+
+  it('refuse un rang impossible', async () => {
+    forcerSemaine(1);
+
+    for (const rang of [0, -1, 1.5, 999]) {
+      const reponse = await app.inject({
+        method: 'POST',
+        url: '/api/v1/suivi',
+        payload: { observations: [observation({ rang })] },
+      });
+      assert.equal(reponse.statusCode, 400, String(rang));
+    }
+  });
+
+  it('n’accepte pas une observation sur un exercice inaccessible', async () => {
+    forcerSemaine(1);
+
+    const reponse = await app.inject({
+      method: 'POST',
+      url: '/api/v1/suivi',
+      payload: { observations: [observation({ exerciceId: 'EXERCICE-IMAGINAIRE' })] },
+    });
+
+    assert.equal(reponse.statusCode, 404);
+  });
+});

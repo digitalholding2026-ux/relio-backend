@@ -70,8 +70,9 @@ export function registerV1Routes(app: FastifyInstance): void {
         { method: 'GET', path: '/api/v1/parcours', description: 'Blocs d’exercices et leur ouverture.' },
         { method: 'GET', path: '/api/v1/exercices/:id', description: 'Énoncé d’un exercice (sans la réponse).' },
         { method: 'GET', path: '/api/v1/exercices/:id/indice/:palier', description: 'Un indice, palier par palier.' },
-        { method: 'POST', path: '/api/v1/corrections', description: 'Corrige une réponse, sans rien stocker.' },
+        { method: 'POST', path: '/api/v1/corrections', description: 'Corrige une réponse et rend l’aide pas à pas, sans rien stocker.' },
         { method: 'POST', path: '/api/v1/progression', description: 'Statut par objectif, calculé sans persistance.' },
+        { method: 'POST', path: '/api/v1/suivi', description: 'Difficultés par objectif, calculées sans persistance.' },
       ],
     };
 

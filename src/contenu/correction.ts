@@ -254,8 +254,12 @@ function jugerAchevement(exercice: Exercice, valeur: Valeur): Achevement {
  * `formeDemandee` sert aussi à l'écran d'exercice (« Réponse attendue : … »)
  * et y est formulée avec l'article. Ici, on ne garde que le complément, sans
  * article : le message complet est alors « … sous la forme <complément> ».
+ *
+ * Exporté pour le tutorat (chantier 7.5), qui doit nommer la forme attendue
+ * dans ses propres messages sans la reformuler — une seconde formulation
+ * divergerait de celle affichée ailleurs.
  */
-function formeDansLeMessage(exercice: Exercice): string | null {
+export function formeDansLeMessage(exercice: Exercice): string | null {
   switch (exercice.regleForme) {
     case 'fraction_irreductible':
       return 'd’une fraction irréductible';

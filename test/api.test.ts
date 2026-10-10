@@ -123,6 +123,7 @@ describe('GET /api/v1', () => {
       '/api/v1/exercices/:id/indice/:palier',
       '/api/v1/parcours',
       '/api/v1/progression',
+      '/api/v1/suivi',
       '/health',
     ]);
   });

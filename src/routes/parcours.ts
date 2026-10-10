@@ -12,6 +12,15 @@ import type { FastifyInstance } from 'fastify';
 
 import { BLOCS, OBJECTIFS, trouverBloc, trouverObjectif } from '../contenu/blocs.js';
 import { corriger, formeDemandee, messagePourErreur, type CorrectionComplete } from '../contenu/correction.js';
+import {
+  categoriePour,
+  construireTutorat,
+  CATEGORIES_DIFICULTE,
+  estCategorieDifficulte,
+  normaliserNbEchecs,
+  tutoratSaisieInvalide,
+  type NiveauAide,
+} from '../contenu/tutorat.js';
 import { exercicesDuBloc, trouverExercice } from '../contenu/exercices.js';
 import { LEÇONS_CANDIDATES, type SignatureErreur } from '../contenu/signatures.js';
 import type { Exercice } from '../contenu/types.js';
@@ -25,6 +34,7 @@ import {
   type PositionDansLAnnee,
 } from '../lib/calendrier.js';
 import { evaluerProgression, type ReponseExercice } from '../lib/progression.js';
+import { suivreProgression, type Observation } from '../lib/suivi.js';
 
 /** Version de la forme du contrat métier. */
 export const PARCOURS_VERSION = 'mvp-1';
@@ -223,15 +233,18 @@ export function registerParcoursRoutes(app: FastifyInstance): void {
   /**
    * Correction d'une réponse.
    *
-   * Le corps ne contient **que** l'identifiant de l'exercice et la saisie :
-   * aucun nom, aucun identifiant d'élève, aucune date de naissance. Rien n'est
-   * stocké — la réponse est corrigée puis oubliée.
+   * Le corps ne contient que l'identifiant de l'exercice, la saisie et le
+   * **nombre d'échecs déjà essuyés** sur cet exercice. Aucun nom, aucun
+   * identifiant d'élève, aucune date de naissance. Rien n'est stocké côté
+   * serveur — la réponse est corrigée, l'aide est calculée, puis tout est
+   * oublié. La mémoire de la tentative est locale au navigateur de l'élève.
    */
   app.post('/api/v1/corrections', async (request, reply) => {
     const corps = (request.body ?? {}) as {
       exerciceId?: unknown;
       reponse?: unknown;
       indiceDemande?: unknown;
+      nbEchecs?: unknown;
     };
 
     if (typeof corps.exerciceId !== 'string' || corps.exerciceId === '') {
@@ -248,16 +261,27 @@ export function registerParcoursRoutes(app: FastifyInstance): void {
     const indiceDemande =
       typeof corps.indiceDemande === 'number' ? corps.indiceDemande : null;
 
+    // Le nombre d'échecs est une **contexte de progression**, pas une donnée
+    // sensible : il détermine quel niveau d'aide rendre. Il est borné et
+    // normalisé, et une valeur absurde retombe sur le niveau 1 plutôt que
+    // d'escalader.
+    const nbEchecs = normaliserNbEchecs(corps.nbEchecs);
+
     let correction: CorrectionComplete;
     try {
       correction = corriger(exercice, corps.reponse, indiceDemande);
     } catch (erreur) {
       // 422 : la requête est comprise, la réponse d'élève ne l'est pas. Le
       // message est destiné à l'élève et ne révèle rien du corrigé.
+      //
+      // Une saisie illisible n'est pas une erreur de l'élève sur le fond : on ne
+      // lui attribue donc **aucune** cause, seulement une consigne de réécriture.
       return reply.status(422).send({
         erreurSaisie: true,
         message: messagePourErreur(erreur),
         exerciceId: exercice.id,
+        categorieDifficulte: 'reponse_illisible',
+        tutorat: tutoratSaisieInvalide(exercice),
       });
     }
 
@@ -281,6 +305,16 @@ export function registerParcoursRoutes(app: FastifyInstance): void {
       // doit pas présenter ce cas comme une conclusion ferme.
       lectureArbitree: correction.lectureArbitree,
       pointsArbitrage: correction.pointsArbitrage,
+      // --- Chantier 7.5 : accompagnement pas à pas -------------------------
+      // Le verdict D5 ne change pas. `tutorat` s'y ajoute : c'est le texte
+      // progressif réellement affiché à l'élève, choisi selon le verdict et le
+      // nombre d'échecs déjà essuyés.
+      //
+      // `categorieDifficulte` vaut `null` quand la réponse est juste : aucune
+      // erreur n'est alors constatée. Une erreur non qualifiable donne
+      // `erreur_non_identifiee` — jamais une cause devinée.
+      categorieDifficulte: categoriePour(correction),
+      tutorat: construireTutorat(exercice, correction, nbEchecs),
     });
   });
 
@@ -332,6 +366,111 @@ export function registerParcoursRoutes(app: FastifyInstance): void {
       // Rappel permanent : aucun niveau global n'est produit.
       avertissement:
         'Cette progression porte sur les seuls exercices-traités. Elle ne donne aucun niveau et aucune note.',
+    });
+  });
+
+  /**
+   * Suivi des difficultés par objectif — chantier 7.5.
+   *
+   * ## Calculé, jamais stocké
+   *
+   * Comme `/api/v1/progression`, cette route est **sans état**. Le client lui
+   * transmet ses observations, le serveur les agrège et les rend : rien n'est
+   * écrit. La conservation est locale au navigateur (voir `observations.ts`),
+   * et le rapport de chantier énonce les limites de ce choix.
+   *
+   * ## Chaque champ est validé, rien n'est deviné
+   *
+   * Le serveur applique la même règle que pour les statuts : un vocabulaire
+   * **fermé**, contrôlé à l'exécution. Une observation portant une catégorie
+   * de difficulté hors catalogue, ou un statut inconnu, est refusée. Le client
+   * ne peut pas introduire un état que le moteur n'a jamais émis.
+   *
+   * Chaque `exerciceId` passe par le même garde d'accès que l'énoncé et la
+   * correction : on ne suit pas une leçon que l'élève n'a pas le droit de
+   * travailler.
+   */
+  app.post('/api/v1/suivi', async (request, reply) => {
+    const corps = (request.body ?? {}) as { observations?: unknown };
+    if (corps.observations !== undefined && !Array.isArray(corps.observations)) {
+      throw new ApiError(400, 'BAD_REQUEST', 'Champ « observations » : une liste est attendue.');
+    }
+
+    const brutes = (corps.observations ?? []) as Array<Record<string, unknown>>;
+    const observations: Observation[] = [];
+
+    for (const item of brutes) {
+      const exerciceId = item.exerciceId;
+      if (typeof exerciceId !== 'string' || exerciceId === '') {
+        throw new ApiError(400, 'BAD_REQUEST', 'Chaque observation doit porter un exerciceId.');
+      }
+
+      const statut = item.statut;
+      if (typeof statut !== 'string' || !estStatutReponse(statut)) {
+        throw new ApiError(
+          400,
+          'BAD_REQUEST',
+          `Statut inconnu : « ${String(statut)} ». Valeurs acceptées : ${STATUTS_REPONSE.join(', ')}.`,
+        );
+      }
+
+      // La catégorie est facultative : l'absence signifie « aucune erreur ».
+      // Une valeur présente doit appartenir au catalogue — sinon elle est
+      // refusée, jamais ramenée de force à « inconnue », qui dirait autre chose.
+      const categorie = item.categorie;
+      if (categorie !== undefined && categorie !== null) {
+        if (typeof categorie !== 'string' || !estCategorieDifficulte(categorie)) {
+          throw new ApiError(
+            400,
+            'BAD_REQUEST',
+            `Catégorie de difficulté inconnue. Valeurs acceptées : ${CATEGORIES_DIFICULTE.join(', ')}.`,
+          );
+        }
+      }
+
+      const rang = item.rang;
+      if (typeof rang !== 'number' || !Number.isInteger(rang) || rang < 1 || rang > 50) {
+        throw new ApiError(400, 'BAD_REQUEST', 'Champ « rang » : un entier entre 1 et 50 est attendu.');
+      }
+
+      const niveauAide = item.niveauAide;
+      if (niveauAide !== undefined && niveauAide !== null) {
+        if (niveauAide !== 1 && niveauAide !== 2 && niveauAide !== 3) {
+          throw new ApiError(400, 'BAD_REQUEST', 'Champ « niveauAide » : 1, 2 ou 3 est attendu.');
+        }
+      }
+
+      const reponse = item.reponse;
+      if (typeof reponse !== 'string' || reponse.length > 200) {
+        throw new ApiError(400, 'BAD_REQUEST', 'Champ « reponse » : texte court attendu.');
+      }
+
+      // Même garde que l'énoncé et la correction : le suivi ne doit pas
+      // devenir un canal d'accès à un bloc fermé.
+      const exercice = exerciceAccessible(exerciceId);
+
+      observations.push({
+        exerciceId,
+        objectifId: exercice.objectifs[0] ?? '',
+        rang,
+        reponse,
+        statut,
+        categorie: (categorie ?? null) as Observation['categorie'],
+        niveauAide: (niveauAide ?? null) as NiveauAide | null,
+        reussiteApresAides: item.reussiteApresAides === true,
+      });
+    }
+
+    const idsObjectifs = OBJECTIFS.map((objectif) => objectif.id);
+    return reply.status(200).send({
+      objectifs: suivreProgression(observations, idsObjectifs),
+      // Rappel permanent, aligné sur celui de `/progression`.
+      avertissement:
+        'Ce suivi porte sur les seuls exercices travaillés sur cet appareil. Il ne donne aucun niveau global, aucune note, et une réussite après aide ne vaut pas maîtrise confirmée.',
+      // Rappel explicite du lieu de conservation, pour que personne ne croie à
+      // un historique durable côté serveur.
+      conservation:
+        'Aucune donnée n’est conservée par le serveur : les observations sont conservées dans le navigateur de l’élève et lui sont renvoyées pour calcul.',
     });
   });
 }
