@@ -123,7 +123,7 @@ describe('axe 1 — justesse mathématique', () => {
         'resultat_juste_consigne_non_respectee',
         `${id} / ${reponse}`,
       );
-      assert.match(correction.libelle, /mathématiquement juste/, `${id} / ${reponse}`);
+      assert.match(correction.libelle, /Ton calcul est juste/, `${id} / ${reponse}`);
       assert.equal(correction.lectureArbitree, true, `${id} / ${reponse}`);
     }
   });
@@ -187,7 +187,7 @@ describe('axe 3 — statut d’interprétation', () => {
     assert.equal(fraction.verdict, 'resultat_juste_consigne_non_respectee');
     assert.equal(fraction.lectureArbitree, true);
     assert.deepEqual(fraction.pointsArbitrage, []);
-    assert.match(fraction.libelle, /mathématiquement juste/);
+    assert.match(fraction.libelle, /Ton calcul est juste/);
 
     const factorisation = corrigerExercice('MVP-B1-E4', '4x^2 - 9');
     assert.equal(factorisation.mathemathiquementJuste, true);
@@ -258,7 +258,7 @@ describe('signatures d’erreur', () => {
     assert.doesNotMatch(correction.explication, /\bOO-[A-Z0-9-]+\b/);
     assert.doesNotMatch(correction.explication, /\bMVP-[A-Z0-9-]+\b/);
     assert.doesNotMatch(correction.explication, /\bLEC-[A-Z0-9-]+\b/);
-    assert.match(correction.explication, /distribuer/i);
+    assert.match(correction.explication, /multiplier/i);
   });
 
   it('renseigne toujours une explication utile', () => {
@@ -279,7 +279,7 @@ describe('robustesse et garde-fous', () => {
       assert.throws(() => corrigerExercice('MVP-B3-E1', illisible));
     }
     const message = messagePourErreur(new Error('fuite technique interne'));
-    assert.equal(message, 'Réponse illisible. Réessaie.');
+    assert.equal(message, 'Je n’arrive pas à lire ta réponse. Vérifie les signes et essaie encore.');
   });
 
   it('ne laisse fuir aucune réponse attendue dans le verdict', () => {
@@ -304,10 +304,10 @@ describe('robustesse et garde-fous', () => {
   });
 
   it('expose la forme demandée en clair pour l’interface', () => {
-    assert.equal(formeDemandee(trouverExercice('MVP-B3-E1')!), 'une fraction irréductible');
+    assert.equal(formeDemandee(trouverExercice('MVP-B3-E1')!), 'une fraction qu’on ne peut plus simplifier');
     assert.equal(
       formeDemandee(trouverExercice('MVP-B1-E4')!),
-      'un produit de facteurs du premier degré',
+      'un produit entre parenthèses',
     );
     assert.equal(formeDemandee(trouverExercice('MVP-B1-E1')!), null);
   });

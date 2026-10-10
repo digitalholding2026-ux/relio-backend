@@ -36,7 +36,7 @@ describe('D5 — cas D : réponse entièrement correcte', () => {
     assert.equal(factorise.mathemathiquementJuste, true);
     assert.equal(factorise.formeRespectee, true);
     assert.equal(factorise.statut, 'correcte');
-    assert.equal(factorise.libelle, 'Ta réponse est juste.');
+    assert.equal(factorise.libelle, 'Bravo ! Ta réponse est juste.');
 
     // Forme a√b respectée.
     const racine = corrigerExercice('MVP-B2-E1', '5√2');
@@ -74,8 +74,8 @@ describe('D5 — cas A : résultat juste, consigne non respectée', () => {
     // doit pas compter cette réponse comme une réussite.
     assert.equal(correction.statut, 'partielle');
     // Le message validé par l'enseignant, avec la forme à écrire.
-    assert.match(correction.libelle, /mathématiquement juste/);
-    assert.match(correction.libelle, /produit de facteurs du premier degré/);
+    assert.match(correction.libelle, /Ton calcul est juste/);
+    assert.match(correction.libelle, /produit entre parenthèses/);
   });
 
   it('signale une fraction exacte non réduite', () => {
@@ -83,7 +83,7 @@ describe('D5 — cas A : résultat juste, consigne non respectée', () => {
     assert.equal(correction.verdict, 'resultat_juste_consigne_non_respectee');
     assert.equal(correction.mathemathiquementJuste, true);
     assert.equal(correction.statut, 'partielle');
-    assert.match(correction.libelle, /fraction irréductible/);
+    assert.match(correction.libelle, /qu’on ne peut plus simplifier/);
   });
 
   it('ne double pas l’article dans le message', () => {
@@ -114,7 +114,7 @@ describe('D5 — cas B : réponse partiellement correcte', () => {
     assert.equal(correction.mathemathiquementJuste, true);
     assert.equal(correction.achevement, 'inacheve');
     assert.equal(correction.statut, 'partielle', 'Ne doit compter ni juste ni fausse.');
-    assert.match(correction.libelle, /partiellement correcte/);
+    assert.match(correction.libelle, /Tu as bien commencé/);
   });
 
   it('distingue l’étape inachevée d’une simple erreur de forme', () => {
@@ -160,7 +160,7 @@ describe('D5 — cas C : réponse incorrecte', () => {
       assert.equal(correction.verdict, 'incorrect', `${id} / « ${reponse} »`);
       assert.equal(correction.mathemathiquementJuste, false);
       assert.equal(correction.statut, 'fausse');
-      assert.equal(correction.libelle, 'Ce n’est pas encore juste.');
+      assert.equal(correction.libelle, 'Ce n’est pas encore ça. Essaie encore.');
     }
   });
 
@@ -250,7 +250,7 @@ describe('D5 — prudence : ce que le moteur ne peut pas déterminer', () => {
     const correction = corriger(sansRegle, '2x + 1');
     assert.equal(correction.verdict, 'a_determiner');
     assert.equal(correction.mathemathiquementJuste, true);
-    assert.match(correction.libelle, /ton enseignant/);
+    assert.match(correction.libelle, /Ton enseignant/);
   });
 
   it('signale l’incertitude quand une règle de forme n’est pas arbitrée', () => {

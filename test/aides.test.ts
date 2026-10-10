@@ -87,7 +87,7 @@ describe('7.4 — aucun identifiant technique dans un message élève', () => {
     // méthode de la leçon sans prétendre savoir ce qui a échoué.
     const correction = corriger(trouverExercice('MVP-B1-E1')!, '999x + 999');
     assert.equal(correction.signatureErreur, 'hors_perimetre');
-    assert.match(correction.explication, /distribuer/i);
+    assert.match(correction.explication, /multiplier/i);
     // Il ne doit pas annoncer une cause précise non reconnue.
     assert.doesNotMatch(correction.explication, /tu as oublié|tu as confondu/i);
   });
@@ -108,14 +108,14 @@ describe('7.4 — l’aide correspond bien à l’objectif', () => {
     const racines = aidePour('OO-L3-1', null);
     const developpement = aidePour('OO-L1-1', null);
 
-    assert.match(factorisation, /factoriser/i);
+    assert.match(factorisation, /trouver un nombre ou une lettre qui divise/i);
     assert.match(factorisation, /3\(x \+ 2\)/, 'L’exemple de factorisation doit être présent.');
 
     assert.match(racines, /racine/i);
     assert.match(racines, /carré parfait/i);
     assert.doesNotMatch(racines, /3x \+ 6/, 'Une racine ne doit pas recevoir un exemple de factorisation.');
 
-    assert.match(developpement, /distribuer/i);
+    assert.match(developpement, /multiplier chaque terme/i);
     assert.match(developpement, /2\(x \+ 3\)/);
     assert.doesNotMatch(developpement, /3\(x \+ 2\)/, 'Le développement ne doit pas utiliser un exemple de factorisation.');
   });

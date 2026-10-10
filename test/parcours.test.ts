@@ -184,7 +184,7 @@ describe('POST /api/v1/corrections', () => {
     assert.equal(corps.signatureErreur, 'non_factorise');
     // Décision D5 : le verdict est renvoyé et tranché, avec son libellé.
     assert.equal(corps.verdict, 'resultat_juste_consigne_non_respectee');
-    assert.match(corps.libelle, /mathématiquement juste/);
+    assert.match(corps.libelle, /Ton calcul est juste/);
     assert.equal(corps.lectureArbitree, true);
     assert.deepEqual(corps.pointsArbitrage, []);
   });

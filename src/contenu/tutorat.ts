@@ -262,13 +262,13 @@ function resteAFaire(correction: CorrectionComplete): 'forme' | 'achevement' | n
 function squeletteDeForme(exercice: Exercice): string {
   switch (exercice.regleForme) {
     case 'fraction_irreductible':
-      return 'Écris d’abord le numérateur, puis le dénominateur, séparés par la barre de fraction, et simplifie avant.';
+      return 'Écris le nombre du haut, puis la barre de fraction, puis le nombre du bas. Simplifie avant.';
     case 'produit_de_facteurs':
-      return 'Écris chaque facteur entre parenthèses, puis les multiplie un par un entre les parenthèses.';
+      return 'Écris chaque groupe entre parenthèses. Comme sur ton cahier.';
     case 'racine_a_sqrt_b':
-      return 'Écris le coefficient, puis le symbole racine, puis le nombre resté sous la racine.';
+      return 'Écris un nombre, puis le symbole racine, puis un nombre qui n’a plus de carré.';
     default:
-      return 'Réécris ta réponse en respectant la forme demandée par la consigne.';
+      return 'Réécris ta réponse comme la consigne le demande.';
   }
 }
 
@@ -293,8 +293,8 @@ function tutoratForme(
       return {
         niveau: 1,
         message:
-          'Tu as bien décomposé le nombre sous la racine. Il reste à en extraire le carré parfait.',
-        action: 'Cherche quel carré parfait se cache dans le nombre sous la racine.',
+          'Tu as bien décomposé le nombre sous la racine. Il reste à en sortir le carré parfait.',
+        action: 'Cherche quel carré parfait est caché dans le nombre sous la racine.',
         origine: 'signature',
         resume: null,
       };
@@ -306,7 +306,7 @@ function tutoratForme(
         // La règle, puis un exemple sur un **autre** nombre : jamais celui de
         // l'exercice en cours.
         message: `Un carré parfait se cache sous la racine : il faut l’extraire avant de continuer. ${correspondance?.exemple ?? ''}`.trim(),
-        action: 'Reprends cette décomposition sur ton propre nombre.',
+        action: 'Fais pareil avec ton nombre.',
         origine: 'objectif',
         resume: null,
       };
@@ -316,7 +316,7 @@ function tutoratForme(
     return {
       niveau: 3,
       message: indice ?? 'Trouve le plus grand carré parfait qui divise le nombre sous ta racine.',
-      action: 'Effectue cette décomposition, puis simplifie complètement la racine.',
+      action: 'Fais cette décomposition, puis finis la racine.',
       origine: indice === null ? 'objectif' : 'indice',
       resume: null,
     };
@@ -329,17 +329,17 @@ function tutoratForme(
         niveau: 1,
         message:
           forme === null
-            ? 'Ton résultat est juste, mais ce n’est pas la forme demandée par la consigne.'
+            ? 'Ton calcul est juste ! Il reste à écrire la réponse comme la consigne le demande.'
             : `Ton résultat est juste, mais ce n’est pas la forme demandée : il faut l’écrire sous la forme ${forme}.`,
-        action: 'Réécris ta réponse avec cette forme.',
+        action: 'Réécris ta réponse sous cette forme.',
         origine: 'forme',
         resume: null,
       };
     case 2:
       return {
         niveau: 2,
-        message: `La valeur est juste, l’écriture ne l’est pas. ${squelette}`,
-        action: 'Réécris maintenant ta réponse en respectant cette forme.',
+        message: `Ton calcul est juste. ${squelette}`,
+        action: 'Réécris ta réponse sous cette forme.',
         origine: 'forme',
         resume: null,
       };
@@ -403,7 +403,7 @@ function tutoratIncorrect(
       return {
         niveau: 1,
         message: orientation,
-        action: 'Réessaie en tenant compte de cette question.',
+        action: 'Réessaie en réfléchissant à cette question.',
         origine: 'signature',
         resume: null,
       };
@@ -416,7 +416,7 @@ function tutoratIncorrect(
       // La question **seule** : énoncer aussi la règle ferait du premier
       // retour un mini-cours, ce que le chantier refuse explicitement.
       message: questionPourObjectif(objectifId),
-      action: 'Réessaie en tenant compte de cette question.',
+      action: 'Réessaie en réfléchissant à cette question.',
       origine: 'objectif',
       resume: null,
     };
@@ -431,7 +431,7 @@ function tutoratIncorrect(
         message: causeConnue
           ? `${aideGenerique(exercice)} ${indice}`
           : indice,
-        action: 'Applique cette étape à ton exercice, puis vérifie ton résultat.',
+        action: 'Fais cette étape dans ton exercice, puis vérifie.',
         origine: 'indice',
         resume: null,
       };
@@ -444,7 +444,7 @@ function tutoratIncorrect(
         // `exemple` est par construction différent de l'exercice en cours :
         // `test/tutorat.test.ts` le revérifie pour les douze exercices.
         message: `${aideGenerique(exercice)} ${exemple}`,
-        action: 'Reprends la même idée sur ton propre exercice.',
+        action: 'Fais pareil dans ton exercice.',
         origine: 'objectif',
         resume: null,
       };
@@ -453,7 +453,7 @@ function tutoratIncorrect(
     return {
       niveau: 2,
       message: aideGenerique(exercice),
-      action: 'Réessaie en tenant compte de cette question.',
+      action: 'Réessaie en réfléchissant à cette question.',
       origine: 'objectif',
       resume: null,
     };
@@ -467,7 +467,7 @@ function tutoratIncorrect(
     return {
       niveau: 3,
       message: indiceDirect,
-      action: 'Effectue cette dernière transformation, puis vérifie ta réponse.',
+      action: 'Fais cette dernière transformation, puis vérifie.',
       origine: 'indice',
       resume: null,
     };
@@ -477,7 +477,7 @@ function tutoratIncorrect(
     return {
       niveau: 3,
       message: `${aideGenerique(exercice)} ${suite}`,
-      action: 'Effectue cette dernière transformation, puis vérifie ta réponse.',
+      action: 'Fais cette dernière transformation, puis vérifie.',
       origine: 'objectif',
       resume: null,
     };
@@ -527,7 +527,7 @@ export function construireTutorat(
         nbEchecs > 0
           ? `Tu y es arrivé après ${nbEchecs === 1 ? 'un essai' : `${nbEchecs} essais`}. Voici la méthode à retenir.`
           : 'Ta réponse est juste. Voici la méthode à retenir.',
-      action: 'Lis la méthode ci-dessous avant de passer à la suite.',
+      action: 'Lis la méthode ci-dessous, puis passe à la suite.',
       origine: 'bilan',
       resume: resumePourObjectif(objectifId),
     };
@@ -545,7 +545,7 @@ export function construireTutorat(
     return {
       niveau: 1,
       message:
-        'Le moteur ne peut pas vérifier la forme demandée. Vérifie toi-même que tu as bien respecté la consigne d’écriture.',
+        'Ton enseignant vérifiera la forme demandée. Vérifie que tu as bien suivi la consigne.',
       action: 'Réécris ta réponse, puis vérifie.',
       origine: 'generique',
       resume: null,
@@ -570,8 +570,8 @@ export function tutoratSaisieInvalide(exercice: Exercice): Tutorat {
   return {
     niveau: 1,
     message:
-      'La réponse n’a pas pu être lue. Vérifie les symboles : le signe « − », la barre de fraction, ' +
-      'le symbole racine et les parenthèses doivent être écrits normalement.',
+      'Je n’arrive pas à lire ta réponse. Vérifie les signes, la barre de fraction, ' +
+      'le symbole racine et les parenthèses.',
     action: 'Réécris ta réponse, ou utilise le clavier mathématique.',
     origine: 'generique',
     resume: null,

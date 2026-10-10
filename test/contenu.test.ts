@@ -499,10 +499,14 @@ describe('cohérence du contenu', () => {
       if (exercice.regleForme === null) continue;
       // Règle structurante du contenu : on ne peut pas exiger une forme que
       // l'élève ne voit pas dans l'énoncé.
+      //
+      // Chantier 7.7 : les mots cherchés suivent le langage simplifié. « Un
+      // produit de facteurs du premier degré » est devenu « un produit entre
+      // parenthèses » — l'invariant reste le même, seul le vocabulaire change.
       const mots = exercice.regleForme === 'fraction_irreductible'
         ? ['irréductible']
         : exercice.regleForme === 'produit_de_facteurs'
-          ? ['produit', 'facteurs']
+          ? ['produit', 'parenthèses']
           : ['a√b'];
       for (const mot of mots) {
         assert.ok(

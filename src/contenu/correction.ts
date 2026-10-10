@@ -70,6 +70,7 @@ import {
   type SignatureErreur,
 } from './signatures.js';
 import { AIDES_PAR_SIGNATURE, aidePour } from './aides.js';
+import { membreReponse } from './egalite.js';
 import type { Correction, Exercice } from './types.js';
 
 /** Lecture de la spécification appliquée au cas « juste mais forme non respectée ». */
@@ -118,15 +119,23 @@ export interface DetailCorrection {
   readonly pointsArbitrage: readonly string[];
 }
 
-/** Analyse une saisie selon le type de grandeur attendu par l'exercice. */
+/**
+ * Analyse une saisie selon le type de grandeur attendu par l'exercice.
+ *
+ * L'égalité éventuelle est extraite **avant** l'analyse : c'est ici que
+ * `A = 2x + 1` devient `2x + 1`. Le reste de la correction — justesse, forme,
+ * achèvement, verdict — est inchangé : seule la façon de *lire* la réponse
+ * change, jamais le jugement porté dessus.
+ */
 function analyserSaisie(exercice: Exercice, saisie: string): Valeur {
+  const membre = membreReponse(exercice, saisie);
   switch (exercice.typeReponse) {
     case 'rationnelle':
-      return analyserRationnel(saisie);
+      return analyserRationnel(membre);
     case 'expression':
-      return analyserExpressionReponse(saisie);
+      return analyserExpressionReponse(membre);
     case 'racine':
-      return analyserRacine(saisie);
+      return analyserRacine(membre);
     default:
       throw new ReponseInvalide('Type de réponse non pris en charge.');
   }
@@ -179,11 +188,11 @@ export function jugerForme(exercice: Exercice, valeur: Valeur): boolean | null {
 export function formeDemandee(exercice: Exercice): string | null {
   switch (exercice.regleForme) {
     case 'fraction_irreductible':
-      return 'une fraction irréductible';
+      return 'une fraction qu’on ne peut plus simplifier';
     case 'produit_de_facteurs':
-      return 'un produit de facteurs du premier degré';
+      return 'un produit entre parenthèses';
     case 'racine_a_sqrt_b':
-      return 'la forme a√b, avec a entier et b sans facteur carré';
+      return 'un nombre, puis le symbole racine, puis un nombre sans carré';
     default:
       return null;
   }
@@ -262,11 +271,11 @@ function jugerAchevement(exercice: Exercice, valeur: Valeur): Achevement {
 export function formeDansLeMessage(exercice: Exercice): string | null {
   switch (exercice.regleForme) {
     case 'fraction_irreductible':
-      return 'd’une fraction irréductible';
+      return 'd’une fraction qu’on ne peut plus simplifier';
     case 'produit_de_facteurs':
-      return 'd’un produit de facteurs du premier degré';
+      return 'd’un produit entre parenthèses';
     case 'racine_a_sqrt_b':
-      return 'a√b, avec a entier et b sans facteur carré';
+      return 'd’un nombre, puis du symbole racine, puis d’un nombre sans carré';
     default:
       return null;
   }
@@ -287,18 +296,18 @@ function messagePourVerdict(
 
   switch (verdict) {
     case 'correct':
-      return 'Ta réponse est juste.';
+      return 'Bravo ! Ta réponse est juste.';
     case 'resultat_juste_consigne_non_respectee':
       return forme === null
-        ? 'Ton résultat est mathématiquement juste, mais tu n’as pas respecté la forme demandée.'
-        : `Ton résultat est mathématiquement juste, mais tu n’as pas respecté la forme demandée. Écris ta réponse sous la forme ${forme}.`;
+        ? 'Ton calcul est juste, mais tu dois écrire la réponse sous la forme demandée.'
+        : `Ton calcul est juste, mais tu dois écrire la réponse sous la forme ${forme}.`;
     case 'partiellement_correct':
-      return 'Ta réponse est partiellement correcte : tu as bien commencé le travail, mais il reste une étape pour le terminer. Continue jusqu’à obtenir une réponse qui ne peut plus être simplifiée.';
+      return 'Tu as bien commencé. Il reste une étape. Continue.';
     case 'incorrect':
-      return 'Ce n’est pas encore juste.';
+      return 'Ce n’est pas encore ça. Essaie encore.';
     case 'a_determiner':
     default:
-      return 'Ta réponse est mathématiquement juste, mais la forme demandée n’a pas pu être vérifiée par le moteur : c’est ton enseignant qui le confirmera.';
+      return 'Ta réponse est juste. Ton enseignant vérifiera la forme demandée.';
   }
 }
 
@@ -417,7 +426,7 @@ export function corriger(
     // ---- CAS D --------------------------------------------------------------
     statut = 'correcte';
     signatureErreur = SIGNATURE_PAR_DEFAUT;
-    explication = 'La valeur et la forme sont conformes.';
+    explication = 'Ton calcul est juste.';
   }
 
   // --- Verdict pédagogique (décision D5) ----------------------------------
@@ -469,16 +478,15 @@ export function messagePourErreur(erreur: unknown): string {
   if (erreur instanceof ExpressionRefusee && erreur.symboleInconnu !== null) {
     const symbole = escapeSymbolePourAffichage(erreur.symboleInconnu);
     return (
-      `Le symbole « ${symbole} » ne fait pas partie de ce qui est attendu ici. ` +
-      `Vérifie ce que tu as écrit : ici, on utilise des chiffres, des lettres, ` +
-      `des opérations et des parenthèses.`
+      `Je n’arrive pas à lire ta réponse. Le symbole « ${symbole} » ne sert pas ici. ` +
+      `Vérifie les signes et essaie encore.`
     );
   }
 
   if (erreur instanceof ReponseInvalide || erreur instanceof ExpressionRefusee) {
     return erreur.message;
   }
-  return 'Réponse illisible. Réessaie.';
+  return 'Je n’arrive pas à lire ta réponse. Vérifie les signes et essaie encore.';
 }
 
 /**

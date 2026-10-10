@@ -77,56 +77,56 @@ export interface AideObjectif {
 export const AIDES_PAR_OBJECTIF: Readonly<Record<ObjectifId, AideObjectif>> = {
   'OO-L1-1': {
     action:
-      'Pour développer, il faut distribuer chaque terme dans les parenthèses, puis regrouper les termes qui se ressemblent.',
+      'Pour développer, il faut multiplier chaque terme par ce qui est devant la parenthèse, puis regrouper ce qui se ressemble.',
     exemple:
       'Par exemple : 2(x + 3) = 2x + 6, car le 2 se multiplie avec le x et avec le 3. ' +
-      'Et si un terme est soustrait, le « − » change le signe de chaque terme entre parenthèses : 3(x − 4) = 3x − 12.',
+      'Et si c’est une soustraction, le « − » change le signe de chaque terme entre parenthèses : 3(x − 4) = 3x − 12.',
     suite:
-      'Applique cette idée à ton exercice : distribue d’abord, puis regroupe les termes en x et les nombres.',
+      'Fais pareil dans ton exercice : multiplies d’abord, puis regroupe les x et les nombres.',
     question:
       'Regarde les deux termes de ton expression : qu’est-ce qui se passe quand le nombre devant la parenthèse se distribue dans chacun d’eux ?'
   },
   'OO-L1-2': {
     action:
-      'Pour factoriser, il faut chercher un facteur commun aux deux termes, ou reconnaître une différence de deux carrés.',
+      'Pour factoriser, il faut trouver un nombre ou une lettre qui divise les deux termes, ou utiliser la formule a² − b² = (a − b)(a + b).',
     exemple:
       'Par exemple : dans 3x + 6, le nombre 3 divise les deux termes, donc 3x + 6 = 3(x + 2). ' +
       'Et 4x² − 9 s’écrit (2x)² − 3², donc 4x² − 9 = (2x − 3)(2x + 3).',
     suite:
-      'Cherche d’abord un nombre ou une lettre qui divise tous les termes de ton expression.',
+      'Cherche d’abord quel nombre ou quelle lettre divise tous les termes de ton expression.',
     question:
       'Regarde les deux termes de ton expression : quel nombre ou quelle expression pourrait diviser chacun des termes ?'
   },
   'OO-L3-1': {
     action:
-      'Pour simplifier une racine, il faut trouver le plus grand carré parfait contenu sous la racine et l’extraire.',
+      'Pour simplifier une racine, il faut trouver le plus grand carré parfait caché sous la racine, puis le mettre devant.',
     exemple:
       'Par exemple : 63 = 9 × 7, et 9 = 3². Donc √63 = √(3² × 7) = 3√7. ' +
       'De même, 147 = 49 × 3, et 49 = 7², donc √147 = 7√3.',
     suite:
-      'Cherche le plus grand carré parfait qui divise le nombre sous la racine, puis simplifie toutes les racines de la même façon avant d’additionner.',
+      'Cherche le plus grand carré parfait dans le nombre sous la racine. Fais pareil pour chaque racine avant d’additionner.',
     question:
       'Regarde le nombre sous la racine : peut-il s’écrire comme un carré parfait multiplié par un autre nombre ?'
   },
   'OO-L5-1': {
     action:
-      'Pour additionner ou soustraire des fractions, il faut d’abord les écrire avec le même dénominateur.',
+      'Pour additionner ou soustraire des fractions, il faut d’abord mettre les deux fractions sur le même dénominateur.',
     exemple:
       'Par exemple : pour 1/2 + 1/3, le dénominateur commun est 6, car 6 est le premier multiple de 2 et de 3. ' +
       'Donc 1/2 + 1/3 = 3/6 + 2/6 = 5/6.',
     suite:
-      'Trouve le dénominateur commun de ton calcul, puis vérifie le signe de chaque terme avant d’additionner.',
+      'Trouve le dénominateur commun de ton calcul, puis vérifie les signes avant d’additionner.',
     question:
       'Regarde les dénominateurs de ton calcul : par quel nombre peut-on les multiplier pour les rendre égaux ?'
   },
   'OO-L5-2': {
     action:
-      'Pour écrire un résultat sous forme irréductible, il faut simplifier le numérateur et le dénominateur en les divisant par un même nombre.',
+      'Pour écrire une fraction qu’on ne peut plus simplifier, il faut diviser le numérateur et le dénominateur par un même nombre.',
     exemple:
       'Par exemple : 6/8 se simplifie en divisant le 6 et le 8 par 2, ce qui donne 3/4. ' +
       'On continue tant que le numérateur et le dénominateur ont encore un facteur commun.',
     suite:
-      'Divise les deux termes de ta fraction par le même nombre, le plus grand possible.',
+      'Divise les deux nombres de ta fraction par le même nombre, le plus grand possible.',
     question:
       'Regarde le numérateur et le dénominateur de ta fraction : par quel nombre could-tu les diviser tous les deux ?'
   },
@@ -142,32 +142,32 @@ export const AIDES_PAR_SIGNATURE: Readonly<
   Partial<Record<SignatureErreur, string>>
 > = {
   denominateur_non_reduit:
-    'Ton calcul est juste, mais le résultat doit être simplifié. ' +
+    'Le résultat doit être simplifié. ' +
     'Divise le numérateur et le dénominateur par un même nombre, plusieurs fois si nécessaire.',
   signe_non_reparti:
-    'Attention au signe : le signe appartient à son terme, pas à tout le calcul. ' +
+    'Attention au signe : il appartient à son terme, pas à tout le calcul. ' +
     'Vérifie chaque terme séparément.',
   signe_non_distribue:
-    'Quand tu distribues une parenthèse précédée du signe « − », ce signe change devant chaque terme. ' +
+    'Quand une parenthèse est précédée du signe « − », ce signe change devant chaque terme. ' +
     'Par exemple : −(x + 3) = −x − 3.',
   termes_non_collectes:
-    'Il reste des termes à regrouper : on additionne les coefficients qui accompagnent la même lettre. ' +
+    'Il reste des termes à regrouper : on additionne les nombres qui accompagnent la même lettre. ' +
     'Par exemple : x + x + 3 = 2x + 3.',
   non_factorise:
-    'Tu as obtenu la bonne valeur, mais il reste tout à factoriser. ' +
-    'Cherche un facteur commun aux deux termes de ton expression.',
+    'Il reste à mettre en produit. ' +
+    'Cherche un nombre ou une lettre qui divise les deux termes de ton expression.',
   signe_inverse_dans_difference_carre:
-    'Dans la formule a² − b² = (a − b)(a + b), le premier facteur garde le signe « − » et le second le signe « + ». ' +
+    'Dans la formule a² − b² = (a − b)(a + b), le premier groupe garde le signe « − » et le second le signe « + ». ' +
     'Par exemple : x² − 4 = (x − 2)(x + 2).',
   carre_parfait_non_extrait:
-    'Un carré parfait se cache sous la racine : il faut l’extraire avant de continuer. ' +
+    'Un carré parfait se cache sous la racine : il faut le mettre devant avant de continuer. ' +
     'Par exemple : √175 = √(25 × 7) = 5√7.',
   coefficient_multiplicatif_oublie:
-    'Le nombre écrit devant la racine compte aussi : il faut le multiplier par la valeur extraite. ' +
+    'Le nombre écrit devant la racine compte aussi : il faut le multiplier par le carré sorti. ' +
     'Par exemple : 2√12 = 2 × 2√3 = 4√3.',
   base_racine_erronee:
-    'Pour additionner des racines, il faut d’abord les ramener à la même base. ' +
-    'Par exemple : √8 et √18 donnent toutes deux 2√2 et √3.',
+    'Pour additionner des racines, il faut d’abord les rendre pareilles. ' +
+    'Par exemple : √8 et √18 donnent toutes deux 2√2 et 3√2.',
   hors_perimetre:
     // Volontairement absent : c'est le cas « aucune cause identifiée ». Le
     // moteur ne doit alors pas inventer de diagnostic, et l'aide générale de
