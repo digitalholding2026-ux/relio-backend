@@ -28,9 +28,23 @@ import {
 
 /** Expression hors du modèle accepté : jamais devinée, toujours refusée. */
 export class ExpressionRefusee extends Error {
-  public constructor(message: string) {
+  /**
+   * Symbole en cause, quand l'échec vient d'un caractère inconnu.
+   *
+   * Chantier 7.6 : ce champ permet de **reformuler** le refus pour l'élève.
+   * Le message d'origine reste technique et sert aux journaux ; sans ce champ,
+   * la seule façon de parler à l'élève serait de recopier la phrase
+   * « Caractère non reconnu : « , ». », qui ne lui dit rien.
+   *
+   * `null` = l'échec porte sur autre chose (expression incomplète, exposant
+   * invalide) : le message existant est déjà compréhensible.
+   */
+  public readonly symboleInconnu: string | null;
+
+  public constructor(message: string, symboleInconnu: string | null = null) {
     super(message);
     this.name = 'ExpressionRefusee';
+    this.symboleInconnu = symboleInconnu;
   }
 }
 
@@ -135,7 +149,7 @@ function analyserJetons(saisie: string): Jeton[] {
       continue;
     }
 
-    throw new ExpressionRefusee(`Caractère non reconnu : « ${c} ».`);
+    throw new ExpressionRefusee(`Caractère non reconnu : « ${c} ».`, c);
   }
 
   return jetons;

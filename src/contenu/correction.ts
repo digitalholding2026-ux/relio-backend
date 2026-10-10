@@ -459,10 +459,37 @@ export function corriger(
 
 /** Erreurs d'analyse converties en message élève, jamais en trace technique. */
 export function messagePourErreur(erreur: unknown): string {
+  // Chantier 7.6 — un symbole inconnu était renvoyé tel quel à l'élève :
+  // « Caractère non reconnu : « , ». » ne lui dit rien de ce qu'il doit
+  // corriger. Le symbole est nommé, mais la phrase reste une consigne.
+  //
+  // Le symbole est réinjecté **et encadré**, sans quoi un caractère de mise en
+  // page pourrait s'injecter dans la réponse HTTP. Le reste du message
+  // technique n'est jamais recopié.
+  if (erreur instanceof ExpressionRefusee && erreur.symboleInconnu !== null) {
+    const symbole = escapeSymbolePourAffichage(erreur.symboleInconnu);
+    return (
+      `Le symbole « ${symbole} » ne fait pas partie de ce qui est attendu ici. ` +
+      `Vérifie ce que tu as écrit : ici, on utilise des chiffres, des lettres, ` +
+      `des opérations et des parenthèses.`
+    );
+  }
+
   if (erreur instanceof ReponseInvalide || erreur instanceof ExpressionRefusee) {
     return erreur.message;
   }
   return 'Réponse illisible. Réessaie.';
+}
+
+/**
+ * Rend un symbole sûr à afficher dans une réponse HTTP.
+ *
+ * Les caractères de contrôle et de mise en page sont retirés : le symbole vient
+ * de la saisie de l'élève, donc d'une source non fiable.
+ */
+function escapeSymbolePourAffichage(symbole: string): string {
+  const nettoye = symbole.replace(/[\u0000-\u001f\u007f-\u009f<>&"'`]/g, '').trim();
+  return nettoye === '' ? '?' : nettoye;
 }
 
 export { estEgal, UN, ZERO };

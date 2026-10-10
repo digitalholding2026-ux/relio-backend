@@ -19,7 +19,12 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
 import { AIDES_PAR_OBJECTIF, type ObjectifId } from '../src/contenu/aides.js';
-import { corriger, VERDICTS, type CorrectionComplete } from '../src/contenu/correction.js';
+import {
+  corriger,
+  messagePourErreur,
+  VERDICTS,
+  type CorrectionComplete,
+} from '../src/contenu/correction.js';
 import { EXERCICES, trouverExercice } from '../src/contenu/exercices.js';
 import { SIGNATURES } from '../src/contenu/signatures.js';
 import {
@@ -391,5 +396,59 @@ describe('7.5 — catégories de difficulté', () => {
       const categorie = categoriePour(corriger(exercice, exercice.reponseAttendue));
       assert.equal(categorie, null, `${exercice.id} : réussite classée comme difficulté`);
     }
+  });
+});
+describe('7.6 — le refus d’un symbole est compréhensible pour l’élève', () => {
+  /**
+   * Le clavier produit des saisies que la grammaire refuse. Un élève de 3e ne
+   * peut pas comprendre « Caractère non reconnu : « , ». » : le message doit
+   * dire quoi vérifier.
+   */
+  function messagePour(exerciceId: string, saisie: string): string {
+    const exercice = trouverExercice(exerciceId)!;
+    try {
+      corriger(exercice, saisie);
+    } catch (erreur) {
+      return messagePourErreur(erreur);
+    }
+    throw new Error(`${exerciceId}/${saisie} : la saisie aurait dû être refusée.`);
+  }
+
+  it('ne renvoie plus la phrase technique à l’élève', () => {
+    for (const saisie of ['1,5x', 'x^2=', '2x+1=', 'a&b', 'x<>2']) {
+      const message = messagePour('MVP-B1-E1', saisie);
+      assert.doesNotMatch(message, /Caractère non reconnu/, `${saisie} : message technique renvoyé`);
+    }
+  });
+
+  it('nomme le symbole en cause et donne une action', () => {
+    const message = messagePour('MVP-B1-E1', '1,5x');
+    assert.match(message, /symbole/i);
+    assert.match(message, /,/);
+    assert.match(message, /Vérifie/i);
+  });
+
+  it('conserve les messages déjà compréhensibles', () => {
+    // Une expression incomplète n'est pas un symbole inconnu : le message
+    // existant reste valable et ne doit pas être réécrit.
+    assert.equal(messagePour('MVP-B1-E1', 'x+'), 'Expression incomplète.');
+  });
+
+  it('ne laisse fuir aucune trace technique', () => {
+    for (const saisie of ['1,5x', 'x^2=', '$$$', '<script>']) {
+      const message = messagePour('MVP-B1-E1', saisie);
+      assert.doesNotMatch(message, /<|>|Error|at Object|undefined|NaN/, `${saisie} : fuite technique.`);
+      assert.ok(message.length > 30, `${saisie} : message trop court pour être utile.`);
+    }
+  });
+
+  it('neutralise un symbole contenant du balisage', () => {
+    // Le symbole vient de la saisie de l'élève : source non fiable.
+    const message = messagePour('MVP-B1-E1', 'x<y');
+    assert.doesNotMatch(message, /<y>/, 'Le symbole brut est réinjecté dans la réponse.');
+  });
+
+  it('reste prudente pour un symbole vide', () => {
+    assert.match(messagePour('MVP-B1-E1', 'x€'), /symbole/i);
   });
 });
