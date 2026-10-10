@@ -1,8 +1,8 @@
 # Contrat d'intégration — Relio frontend ↔ Relio backend
 
-**Version du document :** 1.0.0
+**Version du document :** 2.0.0
 **Version de l'API :** `v1`
-**Statut :** socle technique — **aucune fonctionnalité pédagogique n'est implémentée**
+**Statut :** MVP pédagogique implémenté (chantier 7) — 3 leçons, 12 exercices
 
 Ce document est la référence partagée entre les deux dépôts. La spécification
 machine-lisible est `openapi.yaml`, dans le dépôt backend.
@@ -52,8 +52,18 @@ relio-backend (Railway)
 |---|---|---|---|
 | `GET` | `/health` | Sonde de disponibilité | Public |
 | `GET` | `/api/v1` | Version et état de l'API | Public |
+| `GET` | `/api/v1/parcours` | Blocs d'exercices et semaine d'ouverture | Public |
+| `GET` | `/api/v1/exercices/:id` | Énoncé d'un exercice (jamais la réponse) | Public |
+| `GET` | `/api/v1/exercices/:id/indice/:palier` | Un indice, palier 1 à 3 | Public |
+| `POST` | `/api/v1/corrections` | Corrige une réponse, ne stocke rien | Public |
+| `POST` | `/api/v1/progression` | Statut par objectif, sans persistance | Public |
 
-**Aucune route métier n'existe à ce jour.**
+> **Changement de contrat (v2.0.0).** Le champ `status` de `GET /api/v1` vaut
+> désormais `mvp-pedagogique` au lieu de `socle`. La valeur `socle` signifiait
+> « aucune fonctionnalité pédagogique » : elle ne décrit plus l'API. Le client
+> `relio-frontend` compare des chaînes, il n'est donc pas cassé — mais le
+> frontend doit être redéployé avec la nouvelle API pour éviter d'afficher un
+> état périmé.
 
 ---
 
@@ -78,7 +88,7 @@ relio-backend (Railway)
 {
   "name": "relio-backend",
   "apiVersion": "v1",
-  "status": "socle",
+  "status": "mvp-pedagogique",
   "documentation": "voir docs/CONTRAT-API.md dans le dépôt, et openapi.yaml",
   "endpoints": [
     { "method": "GET", "path": "/health",  "description": "Sonde de disponibilité." },
@@ -101,8 +111,27 @@ relio-backend (Railway)
 | Code HTTP | `error.code` | Cas |
 |---|---|---|
 | `404` | `NOT_FOUND` | Route inexistante |
-| `400` | `BAD_REQUEST` | Requête mal formée |
+| `403` | `BAD_REQUEST` | Exercice d'un bloc pas encore ouvert — **s'applique à l'énoncé, à l'indice et à la correction** |
+| `400` | `BAD_REQUEST` | Requête mal formée, ou statut hors du vocabulaire fermé |
+| `422` | `BAD_REQUEST` | Réponse d'élève illisible — message destiné à l'élève |
 | `500` | `INTERNAL_ERROR` | Erreur serveur — **aucun détail technique renvoyé** |
+
+### Garde-fou calendrier
+
+Le bloc B1 s'ouvre en semaine 1, B2 en semaine 5, B3 en semaine 10. Ce contrôle
+s'applique à **toutes** les routes qui touchent un exercice, et pas seulement à
+la liste du parcours : sans cela, un identifiant deviné ou une URL connue
+permettrait de faire travailler une leçon qui n'a pas encore été enseignée —
+exactement ce que le chantier 6 a établi comme risque principal (F2).
+
+### Statut : vocabulaire fermé
+
+`POST /api/v1/progression` n'accepte que `correcte`, `partielle`, `fausse` et
+`indeterminee`. Toute autre valeur est **refusée en 400**. Le statut vient du
+client : l'accepter sans contrôle permettrait d'introduire dans le calcul de
+progression des états que le modèle n'a pas le droit d'émettre — `non_acquis`
+en particulier, que la règle « un objectif non testé reste `non_evalue` »
+interdit explicitement.
 
 ---
 
@@ -162,12 +191,36 @@ sans réponse réelle.
 
 | Domaine | État |
 |---|---|
-| Authentification | ❌ Non implémentée |
-| Persistance / PostgreSQL | ❌ Non implémentée — documenté comme étape ultérieure |
-| Diagnostic, exercices, progression | ❌ Non implémentés |
+| Authentification | ❌ Non implémentée — hors périmètre du MVP |
+| Persistance / PostgreSQL | ❌ Non implémentée — **délibérément** : la durée de conservation des réponses n'est pas arbitrée, donc rien n'est écrit |
+| Parcours d'exercices (B1, B2, B3) | ✅ Implémenté — 12 exercices originaux |
+| Correction sur trois axes | ✅ Implémenté — justesse / forme / statut |
+| Diagnostic initial (mini-évaluation) | ❌ Hors périmètre : il porte sur L8, hors MVP |
 | Tuteur IA | ❌ **Aucun appel IA.** Aucun fournisseur branché |
 | Contenu BEPC | ❌ **Interdit.** Ni stocké, ni exposé, ni référencé |
 | Données d'élèves | ❌ Aucune collectée |
+
+---
+
+## 10. Variables d'environnement ajoutées
+
+| Variable | Défaut | Rôle |
+|---|---|---|
+| `ANNEE_SCOLAIRE_DEBUT` | `2025-09-01` | Premier jour de la semaine 1. Le référentiel annuel donne le mois, pas le jour : cette date est une approximation documentée, et elle se règle sans redéploiement du code. |
+| `DATE_NAVIGATION_TEST` | *(absente)* | Force la date courante. **Usage de test uniquement** — ne pas définir en production. |
+
+---
+
+## 11. Points laissés ouverts (chantier 7)
+
+Ces points ne sont pas tranchés : le code les signale plutôt que de décider.
+
+| # | Point | Traitement dans le code |
+|---|---|---|
+| 1 | **Forme canonique** : l'ensemble exact des écritures acceptables pour une réponse « juste » | `formeRespectee: null` quand la règle n'est pas arbitrée ; `lectureArbitree: false` est renvoyé au client |
+| 2 | **Lecture « juste mais mal formé »** : `partielle` (A.3) ou erreur ? | Lecture A.3 appliquée et signalée via `pointsArbitrage: ["lecture-partielle-a3"]` |
+| 3 | **Durée de conservation des réponses** | Aucune persistance : la progression est recalculée à la volée |
+| 4 | **Comptes élèves, accès enseignant, tuteur IA** | Hors périmètre, non implémentés |
 
 ---
 

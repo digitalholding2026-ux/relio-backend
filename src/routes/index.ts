@@ -1,6 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import { registerHealthRoutes } from './health.js';
 import { registerV1Routes } from './v1.js';
+import { registerParcoursRoutes } from './parcours.js';
 
 /**
  * Point d'entrée unique des routes.
@@ -12,4 +13,5 @@ import { registerV1Routes } from './v1.js';
 export function registerRoutes(app: FastifyInstance): void {
   registerHealthRoutes(app);
   registerV1Routes(app);
+  registerParcoursRoutes(app);
 }

@@ -6,12 +6,13 @@ info:
   description: |
     Contrat du socle API de Relio.
 
-    **Portée actuelle : aucune fonctionnalité pédagogique n'est implémentée.**
-    L'API expose uniquement une sonde de santé et un point d'entrée versionné.
-    Le champ `status` vaut `socle` et le signifie explicitement.
+    **Portée actuelle : MVP pédagogique de trois leçons.** L'API expose une
+    sonde de santé, un point d'entrée versionné, et les routes métier du
+    parcours d'exercices. Le champ `status` vaut `mvp-pedagogique`.
 
-    Les routes métier futures seront préfixées par `/api/v1` et ajoutées à ce
-    document avant implémentation côté frontend.
+    Aucune réponse attendue n'est exposée au client : les corrections sont
+    calculées côté serveur. Aucune donnée personnelle n'est collectée et
+    aucune réponse d'élève n'est conservée.
   contact:
     name: Équipe Relio
 
@@ -26,6 +27,8 @@ tags:
     description: Sondes d'infrastructure
   - name: api
     description: Point d'entrée versionné de l'API
+  - name: parcours
+    description: Parcours d'exercices du MVP pédagogique
 
 paths:
   /health:
@@ -82,6 +85,177 @@ paths:
                     path: /api/v1
                     description: Version et état de l’API.
 
+  /api/v1/parcours:
+    get:
+      tags: [parcours]
+      summary: Blocs d'exercices et leur ouverture
+      description: |
+        Renvoie les trois blocs du MVP (B1 calcul littéral, B2 racines
+        carrées, B3 calcul numérique) avec la semaine du référentiel annuel à
+        partir de laquelle chacun s'ouvre. Les exercices d'un bloc fermé ne
+        sont pas transmis.
+
+        Le bloc B1 s'ouvre en semaine 1, B2 en semaine 5, B3 en semaine 10 :
+        un élève n'est jamais habilité à travailler une leçon qui n'a pas
+        encore été enseignée.
+      operationId: getParcours
+      security: []
+      responses:
+        '200':
+          description: État du parcours.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ParcoursResponse'
+
+  /api/v1/exercices/{id}:
+    get:
+      tags: [parcours]
+      summary: Énoncé d'un exercice
+      description: |
+        Renvoie l'énoncé, la consigne, la forme demandée et le nombre
+        d'indices disponibles. **La réponse attendue n'est jamais renvoyée.**
+      operationId: getExercice
+      security: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, example: MVP-B1-E1 }
+      responses:
+        '200':
+          description: Exercice disponible.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExercicePublic'
+        '403':
+          description: Le bloc de cet exercice n'est pas encore ouvert.
+        '404':
+          description: Exercice inconnu.
+
+  /api/v1/exercices/{id}/indice/{palier}:
+    get:
+      tags: [parcours]
+      summary: Un indice, palier par palier
+      description: |
+        Trois paliers : rappel, méthode, première étape. Le troisième palier
+        n'est jamais la solution complète.
+      operationId: getIndice
+      security: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+        - name: palier
+          in: path
+          required: true
+          schema: { type: integer, minimum: 1, maximum: 3 }
+      responses:
+        '200':
+          description: Indice du palier demandé.
+        '403':
+          description: |
+            Le bloc de l'exercice n'est pas encore ouvert dans l'année scolaire
+            en cours. Le même garde-fou s'applique à l'énoncé, à l'indice et à
+            la correction : masquer la liste du parcours ne suffit pas à
+            empêcher de travailler une leçon non encore enseignée.
+        '404':
+          description: Exercice ou palier inexistant.
+
+  /api/v1/corrections:
+    post:
+      tags: [parcours]
+      summary: Corrige une réponse
+      description: |
+        Renvoie trois jugements **séparés** :
+
+        - `mathemathiquementJuste` : égalité algébrique ou arithmétique exacte,
+          indépendante de l'écriture de la réponse ;
+        - `formeRespectee` : respect de la forme demandée par l'énoncé,
+          `null` si aucune forme n'est exigée ou si la règle n'est pas arbitrée ;
+        - `statut` : `correcte`, `partielle`, `fausse` ou `indeterminee`.
+
+        Une réponse algébriquement équivalente à la réponse attendue n'est
+        **jamais** déclarée fausse au motif qu'elle est écrite autrement.
+
+        Rien n'est stocké : la réponse est corrigée puis oubliée.
+      operationId: creerCorrection
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [exerciceId, reponse]
+              properties:
+                exerciceId: { type: string }
+                reponse: { type: string }
+                indiceDemande: { type: integer, minimum: 0, maximum: 3 }
+      responses:
+        '200':
+          description: Verdict sur les trois axes.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Correction'
+        '400':
+          description: Corps de requête invalide.
+        '403':
+          description: Le bloc de l'exercice n'est pas encore ouvert.
+        '404':
+          description: Exercice inconnu.
+        '422':
+          description: Réponse illisible — le message est destiné à l'élève.
+
+  /api/v1/progression:
+    post:
+      tags: [parcours]
+      summary: Statut par objectif
+      description: |
+        Calcule la progression à partir des statuts transmis par le client,
+        **sans aucune persistance** : le serveur ne conserve rien.
+
+        Un objectif sans donnée reste `non_evalue` et ne devient jamais
+        `non_acquis`. Aucun niveau global n'est produit.
+
+        Le `statut` transmis par le client est validé contre le vocabulaire
+        fermé ci-dessous : une valeur hors liste (`non_acquis`, `acquis`,
+        `maitrise`…) est **refusée en 400**, jamais devinée ni reinterpretée.
+        Les exercices d'un bloc fermé sont également refusés en 403.
+      operationId: creerProgression
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                reponses:
+                  type: array
+                  items:
+                    type: object
+                    required: [exerciceId, statut]
+                    properties:
+                      exerciceId: { type: string }
+                      statut:
+                        type: string
+                        enum: [correcte, partielle, fausse, indeterminee]
+      responses:
+        '200':
+          description: Progression par objectif.
+        '400':
+          description: |
+            Liste invalide, ou statut hors du vocabulaire fermé
+            (`correcte`, `partielle`, `fausse`, `indeterminee`).
+        '403':
+          description: Un des exercices cités relève d'un bloc pas encore ouvert.
+        '404':
+          description: Exercice inconnu.
+
 components:
   schemas:
     HealthResponse:
@@ -119,11 +293,12 @@ components:
           example: v1
         status:
           type: string
-          enum: [socle]
+          enum: [mvp-pedagogique]
           description: |
-            `socle` = aucune fonctionnalité pédagogique disponible.
-            Une future valeur pourra être ajoutée lorsqu'un module métier
-            sera livré.
+            `mvp-pedagogique` = le parcours d'exercices des trois leçons du
+            MVP est exposé. La valeur `socle`, qui signifiait « aucune
+            fonctionnalité pédagogique », a été retirée lors du chantier 7 :
+            elle ne décrit plus l'API.
         documentation:
           type: string
         endpoints:
@@ -139,6 +314,143 @@ components:
                 type: string
               description:
                 type: string
+
+    ExercicePublic:
+      type: object
+      description: |
+        Projection d'un exercice vers le client. Elle ne contient **jamais** la
+        réponse attendue : celle-ci reste côté serveur.
+      required: [id, blocId, rang, objectifs, enonce, consigne, typeReponse, nbIndices, origine]
+      properties:
+        id: { type: string, example: MVP-B1-E1 }
+        blocId: { type: string, example: B1 }
+        rang: { type: integer, minimum: 1 }
+        objectifs:
+          type: array
+          items: { type: string }
+        enonce: { type: string }
+        consigne: { type: string }
+        typeReponse:
+          type: string
+          enum: [rationnelle, expression, racine]
+        formeDemandee:
+          type: string
+          nullable: true
+          description: Forme exigée par l'énoncé, en clair. `null` si aucune.
+        nbIndices: { type: integer }
+        origine:
+          type: string
+          enum: [originale]
+          description: Le contenu élève est exclusivement original.
+
+    Correction:
+      type: object
+      required: [exerciceId, objectifId, mathemathiquementJuste, formeRespectee, statut, signatureErreur, explication, lectureArbitree]
+      properties:
+        exerciceId: { type: string }
+        objectifId: { type: string }
+        mathemathiquementJuste:
+          type: boolean
+          description: Égalité algébrique ou arithmétique exacte.
+        formeRespectee:
+          type: boolean
+          nullable: true
+          description: |
+            `null` = indéterminable, faute de règle de forme arbitrée.
+            On ne conclut jamais à une faute de forme qu'on n'a pas le droit
+            de juger.
+        statut:
+          type: string
+          enum: [correcte, partielle, fausse, indeterminee]
+        signatureErreur:
+          type: string
+          description: Issue du catalogue fermé des 12 signatures d'erreur.
+        leconsCandidates:
+          type: array
+          items: { type: string }
+        explication: { type: string }
+        indice: { type: integer, nullable: true }
+        lectureArbitree:
+          type: boolean
+          description: |
+            `false` signale qu'une lecture n'est pas arbitrée et ne doit pas
+            être présentée à l'élève comme une conclusion ferme.
+        pointsArbitrage:
+          type: array
+          items: { type: string }
+      example:
+        exerciceId: MVP-B1-E4
+        objectifId: OO-L1-2
+        mathemathiquementJuste: true
+        formeRespectee: false
+        statut: partielle
+        signatureErreur: non_factorise
+        leconsCandidates: [L1]
+        explication: Le résultat est exact, mais il est resté sous forme développée.
+        indice: null
+        lectureArbitree: false
+        pointsArbitrage: [lecture-partielle-a3]
+
+    BlocPublic:
+      type: object
+      required: [id, titre, leconId, volumeHoraireH, semaineDebut, disponible, semainesAvantOuverture, objectifs, exercices]
+      properties:
+        id: { type: string, example: B1 }
+        titre: { type: string }
+        leconId: { type: string }
+        volumeHoraireH: { type: integer }
+        semaineDebut: { type: integer, example: 1 }
+        disponible: { type: boolean }
+        semainesAvantOuverture: { type: integer, nullable: true }
+        objectifs:
+          type: array
+          items:
+            type: object
+            properties:
+              id: { type: string }
+              libelle: { type: string }
+              prerequis:
+                type: array
+                items: { type: string }
+        exercices:
+          type: array
+          items:
+            $ref: '#/components/schemas/ExercicePublic'
+
+    ParcoursResponse:
+      type: object
+      required: [version, anneeScolaire, message, blocs]
+      properties:
+        version: { type: string, example: mvp-1 }
+        anneeScolaire:
+          type: object
+          properties:
+            debut: { type: string, format: date }
+            semaine: { type: integer, nullable: true }
+            dansAnneeScolaire: { type: boolean }
+            anneeTerminee: { type: boolean }
+        message: { type: string }
+        blocs:
+          type: array
+          items:
+            $ref: '#/components/schemas/BlocPublic'
+
+    ProgressionObjectif:
+      type: object
+      description: |
+        Un objectif non testé reste `non_evalue`. Il ne devient jamais
+        `non_acquis` : l'absence de réponse est un manque de données.
+      required: [objectifId, statut, itemsCorrects, itemsPartiels, itemsFausses, sansDonnee]
+      properties:
+        objectifId: { type: string }
+        statut:
+          type: string
+          enum: [non_evalue, signal, hypothese, constat]
+        itemsCorrects: { type: integer }
+        itemsPartiels: { type: integer }
+        itemsFausses: { type: integer }
+        borneSuperieureErreurPct: { type: integer, nullable: true }
+        sansDonnee: { type: boolean }
 
     ErrorResponse:
       type: object
@@ -166,7 +478,7 @@ components:
           example:
             error:
               code: NOT_FOUND
-              message: Route inconnue : GET /inconnu
+              message: 'Route inconnue : GET /inconnu'
     InternalError:
       description: Erreur interne. Aucun détail technique n'est renvoyé.
       content:

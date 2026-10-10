@@ -4,7 +4,7 @@ import type { FastifyInstance } from 'fastify';
 export const API_VERSION = 'v1';
 
 export const API_NAME = 'relio-backend';
-export const API_STATUS = 'socle' as const;
+export const API_STATUS = 'mvp-pedagogique' as const;
 
 export interface HealthResponse {
   status: 'ok';
@@ -54,9 +54,8 @@ export function registerHealthRoutes(app: FastifyInstance): void {
 /**
  * Point d'entrée versionné : documente ce que l'API sait faire aujourd'hui.
  *
- * `status: "socle"` rappelle explicitement qu'aucune fonctionnalité
- * pédagogique n'est implémentée. Le frontend s'appuie sur ce champ pour
- * distinguer « API joignable » de « fonctionnalité disponible ».
+ * `status` indique l'étape du produit : le frontend s'appuie sur ce champ
+ * pour distinguer « API joignable » de « fonctionnalité disponible ».
  */
 export function registerV1Routes(app: FastifyInstance): void {
   app.get('/api/v1', async (_request, reply) => {
@@ -68,6 +67,11 @@ export function registerV1Routes(app: FastifyInstance): void {
       endpoints: [
         { method: 'GET', path: '/health', description: 'Sonde de disponibilité.' },
         { method: 'GET', path: '/api/v1', description: 'Version et état de l’API.' },
+        { method: 'GET', path: '/api/v1/parcours', description: 'Blocs d’exercices et leur ouverture.' },
+        { method: 'GET', path: '/api/v1/exercices/:id', description: 'Énoncé d’un exercice (sans la réponse).' },
+        { method: 'GET', path: '/api/v1/exercices/:id/indice/:palier', description: 'Un indice, palier par palier.' },
+        { method: 'POST', path: '/api/v1/corrections', description: 'Corrige une réponse, sans rien stocker.' },
+        { method: 'POST', path: '/api/v1/progression', description: 'Statut par objectif, calculé sans persistance.' },
       ],
     };
 

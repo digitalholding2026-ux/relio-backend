@@ -99,12 +99,15 @@ describe('GET /api/v1', () => {
     assert.equal(corps.name, 'relio-backend');
   });
 
-  it('annonce explicitement le statut « socle »', async () => {
+  // Le statut a évolué de « socle » à « mvp-pedagogique » avec le chantier 7 :
+  // l'API expose désormais des routes métier. C'est un changement de contrat
+  // explicite, documenté dans docs/CONTRAT-API.md.
+  it('annonce explicitement l’état de la fonctionnalité', async () => {
     const app = await appDeTest();
 
     const corps = (await app.inject({ method: 'GET', url: '/api/v1' })).json();
 
-    assert.equal(corps.status, 'socle');
+    assert.equal(corps.status, 'mvp-pedagogique');
   });
 
   it('documente les routes réellement exposées', async () => {
@@ -113,7 +116,15 @@ describe('GET /api/v1', () => {
     const corps = (await app.inject({ method: 'GET', url: '/api/v1' })).json();
 
     const routes = corps.endpoints.map((e: { path: string }) => e.path).sort();
-    assert.deepEqual(routes, ['/api/v1', '/health']);
+    assert.deepEqual(routes, [
+      '/api/v1',
+      '/api/v1/corrections',
+      '/api/v1/exercices/:id',
+      '/api/v1/exercices/:id/indice/:palier',
+      '/api/v1/parcours',
+      '/api/v1/progression',
+      '/health',
+    ]);
   });
 });
 
