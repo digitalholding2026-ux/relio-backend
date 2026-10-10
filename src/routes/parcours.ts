@@ -267,7 +267,12 @@ export function registerParcoursRoutes(app: FastifyInstance): void {
       // Les trois axes, séparément : le client ne doit jamais les confondre.
       mathemathiquementJuste: correction.mathemathiquementJuste,
       formeRespectee: correction.formeRespectee,
+      achevement: correction.achevement,
       statut: correction.statut,
+      // Verdict pédagogique (décision D5) et son libellé exact. Le frontend
+      // affiche `libelle` tel quel : il ne peut pas diverger de la règle.
+      verdict: correction.verdict,
+      libelle: correction.libelle,
       signatureErreur: correction.signatureErreur,
       leconsCandidates: LEÇONS_CANDIDATES[correction.signatureErreur as SignatureErreur] ?? [],
       explication: correction.explication,

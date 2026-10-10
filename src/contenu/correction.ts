@@ -1,34 +1,53 @@
 /**
- * Correction d'une réponse d'élève, sur trois axes **séparés**.
+ * Correction d'une réponse d'élève, sur **quatre axes séparés**.
  *
  * ┌──────────────────────────────────────────────────────────────────────┐
- * │ 1. JUSTESSE MATHÉMATIQUE                                            │
+ * │ 1. EXACTITUDE MATHÉMATIQUE                                            │
  * │    `mathemathiquementJuste` — égalité EXACTE, jamais de comparaison   │
  * │    de chaînes. `4(x-1)(x+2)` et `(2x-2)(2x+4)` sont égaux : la       │
  * │    réponse est juste, quelle que soit son écriture.                  │
  * ├──────────────────────────────────────────────────────────────────────┤
- * │ 2. RESPECT DE LA FORME DEMANDÉE                                      │
+ * │ 2. RESPECT DE LA CONSIGNE (forme demandée)                            │
  * │    `formeRespectee` — propriété de l'**écriture** (`14/12` n'est      │
  * │    pas irréductible). Renvoie `null` — jamais `false` par défaut —    │
- * │    quand la règle de forme applicable n'est pas arbitrée.           │
+ * │    quand la règle de forme applicable n'est pas arbitrée.            │
  * ├──────────────────────────────────────────────────────────────────────┤
- * │ 3. INTERPRÉTATION PÉDAGOGIQUE                                       │
- * │    `statut` — conséquence des deux axes, dans les seuls termes       │
- * │    autorisés par la spécification : `correcte`, `partielle`,         │
- * │    `fausse`, `indeterminee`.                                        │
+ * │ 3. ACHÈVEMENT                                                        │
+ * │    `achevement` — le travail est-il terminé ? Une étape correcte      │
+ * │    mais inachevée (`√(25×2)`) est exacte **et** inachevée : les      │
+ * │    axes 1 et 3 sont indépendants. Renvoie `null` quand le moteur ne  │
+ * │    sait pas le déterminer — jamais `false` par défaut.               │
+ * ├──────────────────────────────────────────────────────────────────────┤
+ * │ 4. VERDICT PÉDAGOGIQUE                                              │
+ * │    `verdict` — conséquence des trois axes, dans le vocabulaire       │
+ * │    confirmé par l'enseignant (décision D5).                          │
  * └──────────────────────────────────────────────────────────────────────┘
  *
- * **Point non arbitré, signalé et non codé comme définitif.**
- * Lorsqu'une réponse est mathématiquement juste mais pas dans la forme
- * demandée, la spécification valide deux lectures concurrentes : le tableau
- * par question de `specification-diagnostic-initial.md` l'illustre en rouge,
- * tandis que `regles-recommandation-pedagogique.md` (A.3) définit
- * explicitement `partielle` = « juste mais pas dans la forme demandée » et
- * précise qu'elle **ne compte jamais comme fausse**.
+ * **Décision D5 — arbitrée par l'enseignant.**
  *
- * Le moteur applique A.3 — la seule règle explicite et la plus prudente — et
- * **signale** la lecture retenue à l'appelant via `lectureARbitree`. La
- * correction n'est jamais présentée comme définitivement arbitrée.
+ * | Cas | Verdict affiché | Condition |
+ * |---|---|---|
+ * | A | `resultat_juste_consigne_non_respectee` | juste **et** forme non respectée |
+ * | B | `partiellement_correct` | juste **et** forme respectée **et** inachevé |
+ * | C | `incorrect` | mathématiquement faux |
+ * | D | `correct` | juste, achevé, conforme |
+ *
+ * L'enseignant a tranché le point que les chantiers 6 et 7 avaient laissé
+ * ouvert : une réponse exacte hors forme demandée **n'est jamais** déclarée
+ * mathématiquement fausse. Elle reçoit son propre verdict, distinct de
+ * « partiellement correct », qui reconnaît une étape inachevée.
+ *
+ * ⚠️ Cette décision **précise** la règle A.3 sans la contredire : A.3
+ * définissait `partielle` comme « juste mais pas dans la forme demandée, **ou**
+ * étape intermédiaire correcte non achevée », et exigeait qu'elle ne compte
+ * ni comme fausse, ni comme correcte. La séparation en deux verdicts conserve
+ * exactement cette garantie — les deux cas restent non comptables comme
+ * réussite — et donne à l'élève un retour plus précis.
+ *
+ * Le statut technique (`correcte` / `partielle` / `fausse` / `indeterminee`)
+ * est **conservé** : la progression et le vocabulaire pédagogique validé
+ * depuis le chantier 7 en dépendent. `verdict` vient s'y ajouter sans les
+ * remplacer.
  */
 
 import {
@@ -57,12 +76,37 @@ export const LECTURE_PARTIELLE = 'A.3 — partielle';
 
 export type FormeVerdict = 'conforme' | 'non_conforme' | 'indeterminee';
 
+/**
+ * Verdict pédagogique affiché à l'élève — décision D5.
+ *
+ * Le libellé lui-même est fourni par le serveur (`libelle`) : le frontend
+ * l'affiche tel quel. Il ne peut donc pas diverger de la règle appliquée, et
+ * les tests backend peuvent vérifier le texte réellement vu par l'élève.
+ */
+export const VERDICTS = [
+  'correct',
+  'partiellement_correct',
+  'resultat_juste_consigne_non_respectee',
+  'incorrect',
+  'a_determiner',
+] as const;
+
+export type Verdict = (typeof VERDICTS)[number];
+
+/** Achèvement du travail — jamais `false` par défaut, seulement `null` = inconnu. */
+export type Achevement = 'acheve' | 'inacheve' | null;
+
 export interface DetailCorrection {
   readonly exerciceId: string;
   readonly mathemathiquementJuste: boolean;
   readonly forme: FormeVerdict;
   readonly formeRespectee: boolean | null;
+  readonly achevement: Achevement;
   readonly statut: Correction['statut'];
+  /** Verdict pédagogique, décision D5. */
+  readonly verdict: Verdict;
+  /** Libellé exact à afficher à l'élève. */
+  readonly libelle: string;
   readonly signatureErreur: SignatureErreur;
   readonly explication: string;
   /** Index affiché, en cas d'indice déjà demandé. */
@@ -186,6 +230,104 @@ function explicationFausse(exercice: Exercice, signature: SignatureErreur): stri
   }
 }
 
+/**
+ * Jugement d'achèvement.
+ *
+ * Distingue « juste mais le travail n'est pas terminé » de « juste et terminé ».
+ * La seule trace d'achèvement inachevée que le MVP sait reconnaître avec
+ * fiabilité est le **radicand décomposé en produit** : `√(25×2)` montre que
+ * l'élève a trouvé le carré parfait mais n'a pas terminé l'extraction.
+ *
+ * Renvoie `null` — jamais `false` — dans tous les autres cas : le moteur ne
+ * prétend pas savoir qu'un travail est achevé s'il n'a aucun moyen de le
+ * vérifier. C'est ce `null` qui produit le verdict « à déterminer ».
+ */
+function jugerAchevement(exercice: Exercice, valeur: Valeur): Achevement {
+  if (exercice.typeReponse !== 'racine') return null;
+  if (valeur.type !== 'racine') return null;
+  return valeur.radicandDecompose ? 'inacheve' : 'acheve';
+}
+
+/**
+ * Consigne de forme, redigée pour être reprise telle quelle dans le message.
+ *
+ * `formeDemandee` sert aussi à l'écran d'exercice (« Réponse attendue : … »)
+ * et y est formulée avec l'article. Ici, on ne garde que le complément, sans
+ * article : le message complet est alors « … sous la forme <complément> ».
+ */
+function formeDansLeMessage(exercice: Exercice): string | null {
+  switch (exercice.regleForme) {
+    case 'fraction_irreductible':
+      return 'd’une fraction irréductible';
+    case 'produit_de_facteurs':
+      return 'd’un produit de facteurs du premier degré';
+    case 'racine_a_sqrt_b':
+      return 'a√b, avec a entier et b sans facteur carré';
+    default:
+      return null;
+  }
+}
+
+/**
+ * Libellé et message pédagogique du verdict (décision D5).
+ *
+ * Les textes validés par l'enseignant sont repris mot pour mot. Seul le nom
+ * de la forme attendue est inséré, pour que l'élève sache précisément quoi
+ * écrire plutôt qu'un renvoi vague.
+ */
+function messagePourVerdict(
+  verdict: Verdict,
+  exercice: Exercice,
+): string {
+  const forme = formeDansLeMessage(exercice);
+
+  switch (verdict) {
+    case 'correct':
+      return 'Ta réponse est juste.';
+    case 'resultat_juste_consigne_non_respectee':
+      return forme === null
+        ? 'Ton résultat est mathématiquement juste, mais tu n’as pas respecté la forme demandée.'
+        : `Ton résultat est mathématiquement juste, mais tu n’as pas respecté la forme demandée. Écris ta réponse sous la forme ${forme}.`;
+    case 'partiellement_correct':
+      return 'Ta réponse est partiellement correcte : tu as bien commencé le travail, mais il reste une étape pour le terminer. Continue jusqu’à obtenir une réponse qui ne peut plus être simplifiée.';
+    case 'incorrect':
+      return 'Ce n’est pas encore juste.';
+    case 'a_determiner':
+    default:
+      return 'Ta réponse est mathématiquement juste, mais la forme demandée n’a pas pu être vérifiée par le moteur : c’est ton enseignant qui le confirmera.';
+  }
+}
+
+/**
+ * Verdict : conséquence des trois axes.
+ *
+ * Ordre des tests, qui n'est pas décoratif :
+ *
+ * - `!juste` → `incorrect` (cas C). Une réponse exacte n'arrive **jamais**
+ *   ici, quelle que soit son écriture ;
+ * - **achèvement inachevé d'abord** (cas B) : un radicand décomposé
+ *   (`√(25×2)`) est à la fois juste et mal simplifié. Le traiter comme un
+ *   simple cas de forme dit à l'élève « réécris-le autrement », alors que
+ *   l'étape qu'il lui reste à faire est précisément l'extraction du carré
+ *   parfait. Le cas B est donc prioritaire sur le cas A ;
+ * - forme non respectée → cas A ;
+ * - `correct`, ou `a_determiner` quand une forme était exigée mais n'a pas pu
+ *   être jugée. **Un exercice qui n'exige aucune forme n'est jamais**
+ *   `a_determiner` : il n'y a rien à déterminer.
+ */
+function deriverVerdict(
+  juste: boolean,
+  formeExigee: boolean,
+  formeRespectee: boolean | null,
+  achevement: Achevement,
+): Verdict {
+  if (!juste) return 'incorrect';
+  if (achevement === 'inacheve') return 'partiellement_correct';
+  if (formeRespectee === false) return 'resultat_juste_consigne_non_respectee';
+  if (formeExigee && formeRespectee === null) return 'a_determiner';
+  return 'correct';
+}
+
 export interface CorrectionComplete extends DetailCorrection {
   /** Réponse attendue, exposée uniquement côté serveur. */
   readonly valeurAttendue: Valeur;
@@ -214,7 +356,10 @@ export function corriger(
   const forme: FormeVerdict =
     formeRespectee === null ? 'indeterminee' : formeRespectee ? 'conforme' : 'non_conforme';
 
-// --- Axe 3 : interprétation ----------------------------------------------
+  // --- Axe 3 : achèvement du travail --------------------------------------
+  const achevement = jugerAchevement(exercice, valeur);
+
+// --- Axe 4 : interprétation ----------------------------------------------
   // La signature est recherchée dans les deux cas : une réponse juste mais mal
   // formée porte elle aussi une lecture pédagogique (c'est tout l'intérêt du
   // statut « partielle »).
@@ -246,22 +391,39 @@ export function corriger(
       pointsArbitrage.push('forme-non-arbitree');
     }
   } else if (formeRespectee === false) {
-    // ---- LE CAS DÉLÉGATÉ --------------------------------------------------
-    // Mathématiquement juste, forme non respectée. Lecture A.3 : `partielle`.
-    // La signature vient du piège documenté s'il existe ; sinon on ne
-    // surinterprète pas et on reste sur la valeur neutre.
+    // ---- CAS A (décision D5) ---------------------------------------------
+    // Mathématiquement juste, forme non respectée. La règle A.3 s'applique
+    // toujours : `partielle` ne compte ni comme juste ni comme fausse.
+    // Le libellé affiché est désormais celui validé par l'enseignant, et le
+    // marqueur d'arbitrage disparaît : D5 n'est plus une lecture provisoire.
     statut = 'partielle';
     signatureErreur = signatureReconnue ?? SIGNATURE_PAR_DEFAUT;
     explication =
       signatureReconnue === null
         ? 'La valeur est exacte, mais la réponse n\'est pas écrite dans la forme demandée.'
         : explicationFausse(exercice, signatureErreur);
-    pointsArbitrage.push('lecture-partielle-a3');
+  } else if (achevement === 'inacheve') {
+    // ---- CAS B (décision D5) ---------------------------------------------
+    // Étape correcte mais inachevée : l'élève est sur la bonne voie.
+    statut = 'partielle';
+    signatureErreur = signatureReconnue ?? SIGNATURE_PAR_DEFAUT;
+    explication =
+      'Tu as bien décomposé le nombre sous la racine. Il reste à extraire le carré parfait pour terminer la simplification.';
   } else {
+    // ---- CAS D --------------------------------------------------------------
     statut = 'correcte';
     signatureErreur = SIGNATURE_PAR_DEFAUT;
     explication = 'La valeur et la forme sont conformes.';
   }
+
+  // --- Verdict pédagogique (décision D5) ----------------------------------
+  const verdict = deriverVerdict(
+    juste,
+    exercice.regleForme !== null,
+    formeRespectee,
+    achevement,
+  );
+  const libelle = messagePourVerdict(verdict, exercice);
 
   // L'indice n'est jamais la solution complète : le palier 3 s'arrête à la
   // première ligne de résolution.
@@ -276,7 +438,10 @@ export function corriger(
     mathemathiquementJuste: juste,
     forme,
     formeRespectee,
+    achevement,
     statut,
+    verdict,
+    libelle,
     signatureErreur,
     explication,
     indice: indiceAffiche,

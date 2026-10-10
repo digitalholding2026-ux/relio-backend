@@ -175,7 +175,9 @@ paths:
           indépendante de l'écriture de la réponse ;
         - `formeRespectee` : respect de la forme demandée par l'énoncé,
           `null` si aucune forme n'est exigée ou si la règle n'est pas arbitrée ;
-        - `statut` : `correcte`, `partielle`, `fausse` ou `indeterminee`.
+        - `achevement` : `acheve`, `inacheve`, ou `null` si le moteur ne le sait pas ;
+        - `verdict` : `correct`, `partiellement_correct`, `resultat_juste_consigne_non_respectee`, `incorrect` ou `a_determiner` (décision D5) ;
+        - `statut` : statut technique `correcte`, `partielle`, `fausse` ou `indeterminee`.
 
         Une réponse algébriquement équivalente à la réponse attendue n'est
         **jamais** déclarée fausse au motif qu'elle est écrite autrement.
@@ -345,7 +347,7 @@ components:
 
     Correction:
       type: object
-      required: [exerciceId, objectifId, mathemathiquementJuste, formeRespectee, statut, signatureErreur, explication, lectureArbitree]
+      required: [exerciceId, objectifId, mathemathiquementJuste, formeRespectee, achevement, statut, verdict, libelle, signatureErreur, explication, lectureArbitree]
       properties:
         exerciceId: { type: string }
         objectifId: { type: string }
@@ -359,9 +361,44 @@ components:
             `null` = indéterminable, faute de règle de forme arbitrée.
             On ne conclut jamais à une faute de forme qu'on n'a pas le droit
             de juger.
+        achevement:
+          type: string
+          nullable: true
+          enum: [acheve, inacheve]
+          description: |
+            `null` = le moteur ne sait pas le dire. Il ne prétend jamais qu'un
+            travail est achevé sans trace de l'observer : seul un radicand
+            décomposé en produit (`√(25×2)`) permet de conclure `inacheve`.
         statut:
           type: string
           enum: [correcte, partielle, fausse, indeterminee]
+          description: |
+            Statut technique, stable depuis le chantier 7 et consommé par la
+            progression. La règle A.3 s'applique : `partielle` ne compte ni
+            comme juste ni comme fausse.
+        verdict:
+          type: string
+          enum: [correct, partiellement_correct, resultat_juste_consigne_non_respectee, incorrect, a_determiner]
+          description: |
+            Verdict pédagogique de la **décision D5**, arbitrée par
+            l'enseignant :
+
+            | Cas | Verdict | Condition |
+            |---|---|---|
+            | D | `correct` | juste, achevé, conforme |
+            | B | `partiellement_correct` | juste, **et** inachevé |
+            | A | `resultat_juste_consigne_non_respectee` | juste, **et** forme non respectée |
+            | C | `incorrect` | mathématiquement faux |
+            | — | `a_determiner` | le moteur ne peut pas conclure |
+
+            Une réponse mathématiquement juste **n'est jamais** `incorrect`,
+            quelle que soit son écriture.
+        libelle:
+          type: string
+          description: |
+            Libellé exact à afficher à l'élève, calculé par le serveur. Le
+            frontend l'affiche tel quel : il ne peut donc pas diverger de la
+            règle appliquée.
         signatureErreur:
           type: string
           description: Issue du catalogue fermé des 12 signatures d'erreur.
@@ -374,22 +411,30 @@ components:
           type: boolean
           description: |
             `false` signale qu'une lecture n'est pas arbitrée et ne doit pas
-            être présentée à l'élève comme une conclusion ferme.
+            être présentée à l'élève comme une conclusion ferme. La décision D5
+            ayant été prise, le cas « juste mais mal formé » n'est plus
+            signalé par ce champ.
         pointsArbitrage:
           type: array
           items: { type: string }
       example:
-        exerciceId: MVP-B1-E4
-        objectifId: OO-L1-2
+        exerciceId: MVP-B2-E1
+        objectifId: OO-L3-1
         mathemathiquementJuste: true
         formeRespectee: false
+        achevement: inacheve
         statut: partielle
-        signatureErreur: non_factorise
-        leconsCandidates: [L1]
-        explication: Le résultat est exact, mais il est resté sous forme développée.
+        verdict: partiellement_correct
+        libelle: >-
+          Ta réponse est partiellement correcte : tu as bien commencé le travail,
+          mais il reste une étape pour le terminer. Continue jusqu’à obtenir une
+          réponse qui ne peut plus être simplifiée.
+        signatureErreur: hors_perimetre
+        leconsCandidates: []
+        explication: Tu as bien décomposé le nombre sous la racine. Il reste à extraire le carré parfait pour terminer la simplification.
         indice: null
-        lectureArbitree: false
-        pointsArbitrage: [lecture-partielle-a3]
+        lectureArbitree: true
+        pointsArbitrage: []
 
     BlocPublic:
       type: object

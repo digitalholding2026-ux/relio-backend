@@ -116,9 +116,15 @@ describe('axe 1 — justesse mathématique', () => {
       assert.equal(correction.mathemathiquementJuste, true, `${id} / ${reponse}`);
       assert.equal(correction.formeRespectee, false, `${id} / ${reponse}`);
       assert.equal(correction.statut, 'partielle', `${id} / ${reponse}`);
-      // La forme est signalée comme non arbitrée : le client ne présente
-      // jamais ce cas comme une conclusion ferme.
-      assert.equal(correction.lectureArbitree, false, `${id} / ${reponse}`);
+      // Décision D5 : le verdict est tranché, et le libellé dit explicitement
+      // que le résultat est juste.
+      assert.equal(
+        correction.verdict,
+        'resultat_juste_consigne_non_respectee',
+        `${id} / ${reponse}`,
+      );
+      assert.match(correction.libelle, /mathématiquement juste/, `${id} / ${reponse}`);
+      assert.equal(correction.lectureArbitree, true, `${id} / ${reponse}`);
     }
   });
 });
@@ -173,14 +179,21 @@ describe('axe 3 — statut d’interprétation', () => {
     assert.equal(fraction.formeRespectee, false);
     assert.equal(fraction.statut, 'partielle');
     assert.equal(fraction.signatureErreur, 'denominateur_non_reduit');
-    // Le point non arbitré est signalé, jamais présenté comme tranché.
-    assert.equal(fraction.lectureArbitree, false);
-    assert.ok(fraction.pointsArbitrage.includes('lecture-partielle-a3'));
+
+    // Décision D5 : ce cas n'est plus une lecture provisoire. Le statut
+    // technique reste `partielle` (règle A.3 inchangée), mais le verdict est
+    // désormais celui validé par l'enseignant, et rien n'est signalé comme
+    // « à arbitrer ».
+    assert.equal(fraction.verdict, 'resultat_juste_consigne_non_respectee');
+    assert.equal(fraction.lectureArbitree, true);
+    assert.deepEqual(fraction.pointsArbitrage, []);
+    assert.match(fraction.libelle, /mathématiquement juste/);
 
     const factorisation = corrigerExercice('MVP-B1-E4', '4x^2 - 9');
     assert.equal(factorisation.mathemathiquementJuste, true);
     assert.equal(factorisation.statut, 'partielle');
     assert.equal(factorisation.signatureErreur, 'non_factorise');
+    assert.equal(factorisation.verdict, 'resultat_juste_consigne_non_respectee');
   });
 
   it('« fausse » quand la valeur est fausse, sans jamais mixer les axes', () => {

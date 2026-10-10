@@ -182,9 +182,11 @@ describe('POST /api/v1/corrections', () => {
     assert.equal(corps.formeRespectee, false);
     assert.equal(corps.statut, 'partielle');
     assert.equal(corps.signatureErreur, 'non_factorise');
-    // Le point non arbitré est signalé au client.
-    assert.equal(corps.lectureArbitree, false);
-    assert.ok(corps.pointsArbitrage.includes('lecture-partielle-a3'));
+    // Décision D5 : le verdict est renvoyé et tranché, avec son libellé.
+    assert.equal(corps.verdict, 'resultat_juste_consigne_non_respectee');
+    assert.match(corps.libelle, /mathématiquement juste/);
+    assert.equal(corps.lectureArbitree, true);
+    assert.deepEqual(corps.pointsArbitrage, []);
   });
 
   it('renvoie 422 sur une réponse illisible, sans rien divulguer', async () => {
@@ -416,6 +418,104 @@ describe('année scolaire 2026-2027 — configuration et protection des blocs', 
     });
     assert.equal(correction.statusCode, 200);
     assert.equal(correction.json().statut, 'correcte');
+  });
+});
+
+describe('décision D5 — cohérence du verdict renvoyé par l’API', () => {
+  // Le frontend affiche `libelle` tel quel : le texte vu par l'élève est donc
+  // produit, et vérifié, par le serveur. Ces tests verrouillent que l'API
+  // renvoie bien les quatre verdicts et un libellé non vide, sans quoi
+  // l'écran afficherait un champ vide.
+
+  const CAS: ReadonlyArray<readonly [string, string, string]> = [
+    ['MVP-B1-E4', '(2x-3)(2x+3)', 'correct'],
+    ['MVP-B1-E4', '4x^2 - 9', 'resultat_juste_consigne_non_respectee'],
+    ['MVP-B2-E1', '√(25×2)', 'partiellement_correct'],
+    ['MVP-B2-E1', '7√2', 'incorrect'],
+  ];
+
+  it('renvoie le verdict et son libellé pour chaque cas', async () => {
+    forcerSemaine(10); // tous les blocs ouverts
+
+    for (const [exerciceId, reponse, verdictAttendu] of CAS) {
+      const corps = (
+        await app.inject({
+          method: 'POST',
+          url: '/api/v1/corrections',
+          payload: { exerciceId, reponse },
+        })
+      ).json();
+
+      assert.equal(corps.verdict, verdictAttendu, `${exerciceId} / « ${reponse} »`);
+      assert.ok(
+        typeof corps.libelle === 'string' && corps.libelle.trim().length > 0,
+        `${exerciceId} / « ${reponse} » : libellé absent`,
+      );
+      // La décision D5 : jamais « incorrect » quand la valeur est exacte.
+      if (corps.mathemathiquementJuste) {
+        assert.notEqual(corps.verdict, 'incorrect', `${exerciceId} / « ${reponse} »`);
+      }
+    }
+  });
+
+  it('donne un libellé différent pour chaque verdict', async () => {
+    forcerSemaine(10);
+    const libelles = new Map<string, string>();
+
+    for (const [exerciceId, reponse, verdict] of CAS) {
+      const corps = (
+        await app.inject({
+          method: 'POST',
+          url: '/api/v1/corrections',
+          payload: { exerciceId, reponse },
+        })
+      ).json();
+
+      const precedent = libelles.get(verdict);
+      assert.ok(
+        precedent === undefined || precedent === corps.libelle,
+        `Verdict ${verdict} : deux libellés différents.`,
+      );
+      libelles.set(verdict, corps.libelle);
+    }
+
+    assert.equal(libelles.size, 4, 'Les quatre verdicts doivent être distincts.');
+  });
+
+  it('renvoie les trois axes séparés avec le verdict', async () => {
+    forcerSemaine(10);
+    const corps = (
+      await app.inject({
+        method: 'POST',
+        url: '/api/v1/corrections',
+        payload: { exerciceId: 'MVP-B2-E1', reponse: '√(25×2)' },
+      })
+    ).json();
+
+    assert.equal(corps.mathemathiquementJuste, true);
+    assert.equal(corps.formeRespectee, false);
+    assert.equal(corps.achevement, 'inacheve');
+    assert.equal(corps.verdict, 'partiellement_correct');
+    assert.equal(corps.statut, 'partielle');
+  });
+
+  it('ne fuit pas la réponse attendue dans le libellé', async () => {
+    forcerSemaine(10);
+    for (const [exerciceId, reponse] of CAS) {
+      const exercice = EXERCICES.find((e) => e.id === exerciceId);
+      const corps = (
+        await app.inject({
+          method: 'POST',
+          url: '/api/v1/corrections',
+          payload: { exerciceId, reponse },
+        })
+      ).json();
+
+      assert.ok(
+        !JSON.stringify(corps.libelle).includes(exercice?.reponseAttendue ?? '§'),
+        `${exerciceId} : la réponse attendue fuit dans le libellé.`,
+      );
+    }
   });
 });
 

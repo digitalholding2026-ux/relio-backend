@@ -256,9 +256,39 @@ Ces points ne sont pas tranchés : le code les signale plutôt que de décider.
 | # | Point | Traitement dans le code |
 |---|---|---|
 | 1 | **Forme canonique** : l'ensemble exact des écritures acceptables pour une réponse « juste » | `formeRespectee: null` quand la règle n'est pas arbitrée ; `lectureArbitree: false` est renvoyé au client |
-| 2 | **Lecture « juste mais mal formé »** : `partielle` (A.3) ou erreur ? | Lecture A.3 appliquée et signalée via `pointsArbitrage: ["lecture-partielle-a3"]` |
+| 2 | ~~**Lecture « juste mais mal formé »**~~ | ✅ **Arbitré au chantier 7.3** — voir § 13 |
 | 3 | **Durée de conservation des réponses** | Aucune persistance : la progression est recalculée à la volée |
 | 4 | **Comptes élèves, accès enseignant, tuteur IA** | Hors périmètre, non implémentés |
+
+---
+
+## 13. Décision D5 — arbitrage pédagogique (chantier 7.3)
+
+Le point 2 ci-dessus est **tranché**. L'enseignant a confirmé la règle suivante,
+appliquée par le moteur et renvoyée par `POST /api/v1/corrections` :
+
+| Cas | Verdict | Condition |
+|---|---|---|
+| **D** | `correct` | juste, achevé, conforme à la consigne |
+| **B** | `partiellement_correct` | juste **et** inachevé (ex. `√(25×2)`) |
+| **A** | `resultat_juste_consigne_non_respectee` | juste **et** forme non respectée (ex. `4x² − 9`) |
+| **C** | `incorrect` | mathématiquement faux |
+| — | `a_determiner` | le moteur ne peut pas conclure, et le dit |
+
+**Règle cardinale** : une réponse mathématiquement juste n'est **jamais**
+déclarée incorrecte, quelle que soit son écriture.
+
+Cette décision **précise** la règle A.3 sans la contredire : `partielle` reste
+le statut technique des cas A et B, et ne compte donc toujours ni comme juste
+ni comme fausse pour la progression. Le champ `verdict` s'ajoute à côté, sans
+remplacer `statut`.
+
+**Le libellé affiché vient du serveur** (`libelle`) : le frontend ne le
+reconstruit pas, il ne peut donc pas diverger de la règle appliquée.
+
+**Limite assumée** : le moteur ne sait reconnaître un travail inachevé que dans
+un cas — un radicand décomposé en produit. Pour tout le reste, `achevement`
+vaut `null` et le moteur ne prétend pas savoir.
 
 ---
 

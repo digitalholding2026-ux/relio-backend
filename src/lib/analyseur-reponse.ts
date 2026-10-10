@@ -73,6 +73,17 @@ export interface ValeurRacine {
   readonly radicand: number;
   /** `b` avant extraction des carrés parfaits — sert au diagnostic d'erreur. */
   readonly radicandSaisi: number;
+  /**
+   * Vrai si l'élève a écrit le radicand **décomposé en produit**
+   * (`√(25×2)`, `√(2·25)`) au lieu du nombre seul.
+   *
+   * C'est la trace de l'**étape d'achèvement** manquante : l'élève a bien
+   * identifié un carré parfait, mais n'a pas terminé l'extraction. Sans ce
+   * champ, `√(25×2)` serait indiscernable de `√50` — les deux valent la même
+   * chose — et la réponse serait traitée comme une simple erreur de forme
+   * alors que l'élève est sur la bonne voie (décision D5, cas B).
+   */
+  readonly radicandDecompose: boolean;
 }
 
 export type Valeur = ValeurRationnelle | ValeurExpression | ValeurRacine;
@@ -138,7 +149,19 @@ export function analyserExpressionReponse(saisie: string): ValeurExpression {
 // Racines carrées
 // ---------------------------------------------------------------------------
 
-const MOTIF_RACINE = /^([+-]?)(\d*)√\(?(\d+)\)?$/;
+/**
+ * Motif d'une réponse de la forme `a√b`.
+ *
+ * Deux écritures sont admises :
+ *
+ * - **avec parenthèses** — `√(25×2)`, `√(50)`, `√(2)` : le contenu est
+ *   interprété, et `radicandDecompose` indique s'il s'agissait d'un produit ;
+ * - **sans parenthèses** — `√50`, `5√2` : le radicand est un entier simple.
+ *
+ * Tout ce que la grammaire ne sait pas interpréter est refusé. Elle ne devine
+ * jamais : `√(25+2)` ou `√(x×2)` sont rejetés, pas approximés.
+ */
+const MOTIF_RACINE = /^([+-]?)(\d*)√\(([^()]+)\)$|^([+-]?)(\d*)√(\d+)$/;
 
 /**
  * Analyse une réponse de la forme `a√b`.
@@ -146,6 +169,10 @@ const MOTIF_RACINE = /^([+-]?)(\d*)√\(?(\d+)\)?$/;
  * La valeur est **normalisée** : `6√8` devient `12√2`, exactement comme on
  * l'écrit au tableau. `50√2` reste `50√2` — c'est bien la faute d'enveloppe,
  * et elle doit rester visible.
+ *
+ * Un radicand écrit comme un produit (`√(25×2)`) est accepté : le produit est
+ * calculé, et `radicandDecompose` est mis à `true` pour que la correction
+ * puisse reconnaître une étape correcte mais inachevée.
  */
 export function analyserRacine(saisie: string): ValeurRacine {
   const texte = saisie
@@ -153,7 +180,7 @@ export function analyserRacine(saisie: string): ValeurRacine {
     .replace(/\u2212/g, '-')
     .replace(/\s+/g, '')
     .replace(/\u00d7/g, '*')
-    .replace(/\*/g, '');
+    .replace(/\u00b7/g, '*');
   if (texte === '') throw new ReponseInvalide('Réponse vide.');
 
   const motif = texte.match(MOTIF_RACINE);
@@ -161,15 +188,56 @@ export function analyserRacine(saisie: string): ValeurRacine {
     throw new ReponseInvalide('Réponse attendue sous la forme a√b, par exemple 11√2.');
   }
 
-  const signe = motif[1] === '-' ? -1n : 1n;
-  const coefficientSaisi = motif[2] === undefined || motif[2] === '' ? 1n : BigInt(motif[2]);
-  const radicandSaisi = Number(motif[3] ?? '0');
+  // Groupe 1-3 : forme avec parenthèses. Groupe 4-6 : forme simple.
+  const avecParentheses = motif[1] !== undefined;
+  const signe = (avecParentheses ? motif[1] : motif[4]) === '-' ? -1n : 1n;
+  const brutCoefficient = avecParentheses ? motif[2] : motif[5];
+  const brutRadicand = avecParentheses ? motif[3] : motif[6];
+  const coefficientSaisi = brutCoefficient === undefined || brutCoefficient === '' ? 1n : BigInt(brutCoefficient);
 
-  if (radicandSaisi < 0) {
+  const corpsRadicand = brutRadicand ?? '';
+  const lu = avecParentheses
+    ? analyserRadicand(corpsRadicand)
+    : { valeur: Number(corpsRadicand), produit: false };
+  const radicandSaisi = lu.valeur;
+
+  if (!Number.isInteger(radicandSaisi) || radicandSaisi < 0) {
     throw new ReponseInvalide('Le radicand doit être un entier positif.');
   }
 
-  return normaliserRacine(rationnel(signe * coefficientSaisi), radicandSaisi);
+  return {
+    ...normaliserRacine(rationnel(signe * coefficientSaisi), radicandSaisi),
+    radicandDecompose: lu.produit,
+  };
+}
+
+/**
+ * Calcule le contenu d'un radicand entre parenthèses.
+ *
+ * Accepte un entier simple (`50`, `2`) et un produit d'entiers
+ * (`25*2`, `2*25`, `5*5*2`). Renvoie `NaN` pour tout le reste — l'appelant
+ * refuse alors la saisie plutôt que de l'interpréter de travers.
+ *
+ * Le deuxième résultat indique si le contenu était un **produit** : c'est la
+ * trace de l'étape d'achèvement manquante (décision D5, cas B).
+ */
+function analyserRadicand(corps: string): { valeur: number; produit: boolean } {
+  const morceaux = corps.split('*');
+
+  if (morceaux.length === 1) {
+    return { valeur: /^\d{1,9}$/.test(corps) ? Number(corps) : Number.NaN, produit: false };
+  }
+
+  if (morceaux.length > 4) return { valeur: Number.NaN, produit: false };
+
+  let total = 1;
+  for (const morceau of morceaux) {
+    if (!/^\d{1,6}$/.test(morceau)) return { valeur: Number.NaN, produit: false };
+    total *= Number(morceau);
+    if (total > 1e9) return { valeur: Number.NaN, produit: false };
+  }
+
+  return { valeur: total, produit: true };
 }
 
 /**
@@ -204,6 +272,10 @@ export function normaliserRacine(coefficient: Rational, radicand: number): Valeu
     coefficient: rationnel(coefficient.num * facteur, coefficient.den),
     radicand: Number(partieImpare),
     radicandSaisi: radicand,
+    // `normaliserRacine` travaille sur la valeur numérique : elle ne peut pas
+    // savoir comment l'élève l'a écrite. `analyserRacine` surcharge donc ce
+    // champ juste après l'appel.
+    radicandDecompose: false,
   };
 }
 
