@@ -1,0 +1,179 @@
+openapi: 3.1.0
+
+info:
+  title: API Relio
+  version: 1.0.0
+  description: |
+    Contrat du socle API de Relio.
+
+    **Portée actuelle : aucune fonctionnalité pédagogique n'est implémentée.**
+    L'API expose uniquement une sonde de santé et un point d'entrée versionné.
+    Le champ `status` vaut `socle` et le signifie explicitement.
+
+    Les routes métier futures seront préfixées par `/api/v1` et ajoutées à ce
+    document avant implémentation côté frontend.
+  contact:
+    name: Équipe Relio
+
+servers:
+  - url: http://localhost:3000
+    description: Développement local
+  - url: https://relio-backend.up.railway.app
+    description: Déploiement Railway (URL réelle à confirmer une fois déployé)
+
+tags:
+  - name: infrastructure
+    description: Sondes d'infrastructure
+  - name: api
+    description: Point d'entrée versionné de l'API
+
+paths:
+  /health:
+    get:
+      tags: [infrastructure]
+      summary: Sonde de disponibilité
+      description: |
+        Endpoint public utilisé par Railway pour vérifier que le service est
+        vivant. Volontairement minimal et rapide : il ne divulgue ni version de
+        dépendance, ni variable d'environnement, ni secret.
+      operationId: getHealth
+      security: []
+      responses:
+        '200':
+          description: Le service est opérationnel.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+              example:
+                status: ok
+                name: relio-backend
+                version: 0.1.0
+                environment: production
+                uptimeSeconds: 42
+                timestamp: '2026-01-01T00:00:00.000Z'
+
+  /api/v1:
+    get:
+      tags: [api]
+      summary: Version et état de l'API
+      description: |
+        Documente ce que l'API sait faire aujourd'hui. Sert aussi au frontend
+        pour distinguer « API joignable » de « fonctionnalité disponible ».
+      operationId: getApiInfo
+      security: []
+      responses:
+        '200':
+          description: Informations sur l'API.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiInfoResponse'
+              example:
+                name: relio-backend
+                apiVersion: v1
+                status: socle
+                documentation: voir docs/CONTRAT-API.md dans le dépôt, et openapi.yaml
+                endpoints:
+                  - method: GET
+                    path: /health
+                    description: Sonde de disponibilité.
+                  - method: GET
+                    path: /api/v1
+                    description: Version et état de l’API.
+
+components:
+  schemas:
+    HealthResponse:
+      type: object
+      required: [status, name, version, environment, uptimeSeconds, timestamp]
+      properties:
+        status:
+          type: string
+          enum: [ok]
+        name:
+          type: string
+          example: relio-backend
+        version:
+          type: string
+          example: 0.1.0
+        environment:
+          type: string
+          enum: [development, test, production]
+        uptimeSeconds:
+          type: integer
+          minimum: 0
+        timestamp:
+          type: string
+          format: date-time
+
+    ApiInfoResponse:
+      type: object
+      required: [name, apiVersion, status, documentation, endpoints]
+      properties:
+        name:
+          type: string
+          example: relio-backend
+        apiVersion:
+          type: string
+          example: v1
+        status:
+          type: string
+          enum: [socle]
+          description: |
+            `socle` = aucune fonctionnalité pédagogique disponible.
+            Une future valeur pourra être ajoutée lorsqu'un module métier
+            sera livré.
+        documentation:
+          type: string
+        endpoints:
+          type: array
+          items:
+            type: object
+            required: [method, path, description]
+            properties:
+              method:
+                type: string
+                enum: [GET, POST, PUT, PATCH, DELETE]
+              path:
+                type: string
+              description:
+                type: string
+
+    ErrorResponse:
+      type: object
+      required: [error]
+      description: Format unique de toutes les erreurs.
+      properties:
+        error:
+          type: object
+          required: [code, message]
+          properties:
+            code:
+              type: string
+              enum: [BAD_REQUEST, NOT_FOUND, INTERNAL_ERROR, SERVICE_UNAVAILABLE]
+            message:
+              type: string
+              description: Message destiné au développeur, jamais à l'élève.
+
+  responses:
+    NotFound:
+      description: Route inconnue.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error:
+              code: NOT_FOUND
+              message: Route inconnue : GET /inconnu
+    InternalError:
+      description: Erreur interne. Aucun détail technique n'est renvoyé.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error:
+              code: INTERNAL_ERROR
+              message: Erreur interne du serveur.
