@@ -31,16 +31,24 @@ export const NOMBRE_SEMAINES = 30;
  * Premier jour de la première semaine de cours de l'année scolaire en cours.
  *
  * Valeur retenue par le propriétaire de Relio pour l'année **2026-2027** :
- * le 5 septembre 2026.
+ * le **lundi 7 septembre 2026**.
  *
- * Deux précautions :
+ * Le jour de la semaine est délibéré. Une rentrée tombant un samedi décalait
+ * les ouvertures de blocs d'un samedi, ce qui est inhabituel pour une année
+ * scolaire : les semaines sont ici des blocs de sept jours à partir de la date
+ * de rentrée, donc S1 tombe le samedi, S5 le samedi suivant, etc. Avec une
+ * rentrée un lundi, **chaque ouverture tombe un lundi**, comme attendu.
+ *
+ * Trois précautions :
  *
  * - le référentiel annuel `data/referentiel-maths-3e-cm-2025-2026.json` donne
- *   des **mois**, pas des jours. Le 5 septembre est donc une décision
+ *   des **mois**, pas des jours. Le 7 septembre est donc une décision
  *   projet, pas une donnée extraite du document source ;
+ * - les semaines d'ouverture des blocs (S1, S5, S10) viennent du référentiel et
+ *   ne changent pas : seule la date de début est une décision projet ;
  * - cette valeur est le **repli** utilisé quand `ANNEE_SCOLAIRE_DEBUT` est
- *   absente. La valeur définie en production reste prioritaire, car elle permet de
- *   changer d'année scolaire sans redéploiement.
+ *   absente. La valeur définie en production reste prioritaire, car elle permet
+ *   de changer d'année scolaire sans redéploiement.
  *
  * ⚠️ Une valeur périmée n'est pas anodine : avec une année antérieure, toute
  * date située après la fin de cette année-là est déclarée « année terminée »,
@@ -49,7 +57,7 @@ export const NOMBRE_SEMAINES = 30;
  * rien ne soit réellement indisponible est un défaut d'outillage, pas un
  * état pédagogique. C'est pourquoi le défaut est vérifié par un test.
  */
-export const DEBUT_ANNEE_DEFAUT = '2026-09-05';
+export const DEBUT_ANNEE_DEFAUT = '2026-09-07';
 
 const MS_PAR_JOUR = 24 * 60 * 60 * 1000;
 

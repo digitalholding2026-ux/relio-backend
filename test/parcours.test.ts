@@ -301,30 +301,47 @@ describe('POST /api/v1/corrections', () => {
 
 describe('année scolaire 2026-2027 — configuration et protection des blocs', () => {
   // Le helper `forcerSemaine` de ce fichier ancre la date sur
-  // `DEBUT_ANNEE_DEFAUT`, qui vaut désormais 2026-09-05. Ces tests vérifient
-  // que l'API lit bien la variable d'environnement, et que le garde-fou
-  // calendrier tient sur l'année réellement en cours.
+  // `DEBUT_ANNEE_DEFAUT`, qui vaut désormais 2026-09-07 (lundi). Ces tests
+  // vérifient que l'API lit bien la variable d'environnement, et que le
+  // garde-fou calendrier tient sur l'année réellement en cours.
 
   it('expose la date de début configurée dans la réponse', async () => {
     forcerSemaine(1);
     const corps = (await app.inject({ method: 'GET', url: '/api/v1/parcours' })).json();
-    assert.equal(corps.anneeScolaire.debut, '2026-09-05');
+    assert.equal(corps.anneeScolaire.debut, '2026-09-07');
   });
 
   it('suit la variable ANNEE_SCOLAIRE_DEBUT lorsqu’elle est définie', async () => {
+    // ⚠️ `forcerSemaine` ancre la date sur `DEBUT_ANNEE_DEFAUT` (7 septembre),
+    // pas sur la variable. Pour tester une rentrée plus tardive, il faut une
+    // date postérieure à cette rentrée-là : on se place donc en semaine 1 de
+    // septembre, mais au moment où la nouvelle rentrée est déjà passée.
+    //
+    // Le but du test est de prouver que la variable **prime sur le défaut** :
+    // avec une rentrée au 14 septembre, une date du 7 septembre (semaine 1
+    // du défaut) doit être déclarée « hors année scolaire ».
     forcerSemaine(1);
-    // Une année antérieure doit être prise en compte : c'est le scénario qui
-    // a produit l'incident du chantier 7.1.
-    process.env.ANNEE_SCOLAIRE_DEBUT = '2026-09-05';
-    const annee2026 = (await app.inject({ method: 'GET', url: '/api/v1/parcours' })).json();
-    assert.equal(annee2026.anneeScolaire.debut, '2026-09-05');
-    assert.equal(annee2026.anneeScolaire.dansAnneeScolaire, true);
-    assert.ok(
-      annee2026.blocs.find((b: { id: string }) => b.id === 'B1').disponible,
-      'B1 doit être ouvert en semaine 1 de l’année configurée.',
-    );
+    process.env.ANNEE_SCOLAIRE_DEBUT = '2026-09-14';
+
+    const corps = (await app.inject({ method: 'GET', url: '/api/v1/parcours' })).json();
+
+    // La variable est bien celle qui est utilisée…
+    assert.equal(corps.anneeScolaire.debut, '2026-09-14');
+    // …et elle prime effectivement sur le défaut du code : le 7 septembre
+    // serait la semaine 1 si le défaut était encore utilisé.
+    assert.equal(corps.anneeScolaire.dansAnneeScolaire, false);
+    assert.equal(corps.anneeScolaire.semaine, null);
 
     delete process.env.ANNEE_SCOLAIRE_DEBUT;
+
+    // Sans la variable, le défaut reprend la main et la même date est en S1.
+    const avecDefaut = (await app.inject({ method: 'GET', url: '/api/v1/parcours' })).json();
+    assert.equal(avecDefaut.anneeScolaire.debut, '2026-09-07');
+    assert.equal(avecDefaut.anneeScolaire.semaine, 1);
+    assert.ok(
+      avecDefaut.blocs.find((b: { id: string }) => b.id === 'B1').disponible,
+      'B1 doit être ouvert en semaine 1 de l’année par défaut.',
+    );
   });
 
   it('retombe sur le défaut quand la variable est absente', async () => {

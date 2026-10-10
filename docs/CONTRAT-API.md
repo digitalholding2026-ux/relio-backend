@@ -206,7 +206,7 @@ sans réponse réelle.
 
 | Variable | Défaut | Rôle |
 |---|---|---|
-| `ANNEE_SCOLAIRE_DEBUT` | `2026-09-05` | Premier jour de la semaine 1. **Année scolaire 2026-2027**, date retenue par le propriétaire. Le référentiel annuel donne le mois, pas le jour : cette date est une décision projet, et elle se règle sans redéploiement du code. **À définir explicitement sur Railway** — voir § 11. |
+| `ANNEE_SCOLAIRE_DEBUT` | `2026-09-07` | Premier jour de la semaine 1. **Année scolaire 2026-2027**, date retenue par le propriétaire. Le référentiel annuel donne le mois, pas le jour : cette date est une décision projet, et elle se règle sans redéploiement du code. **À définir explicitement sur Railway** — voir § 11. |
 | `DATE_NAVIGATION_TEST` | *(absente)* | Force la date courante. **Usage de test uniquement** — ne pas définir en production. |
 
 ---
@@ -214,7 +214,8 @@ sans réponse réelle.
 ## 11. Année scolaire — action requise sur Railway
 
 Le calendrier dépend de `ANNEE_SCOLAIRE_DEBUT`. **Elle doit être définie
-explicitement sur Railway**, même si elle est identiques au défaut du code.
+explicitement sur Railway**, et sa valeur vérifiée : une variable périmée a
+priorité sur le code et referme tous les blocs.
 
 Une valeur absente ou périmée n'est pas anodine : toute date située après la fin
 de l'année scolaire correspondante est déclarée « année terminée », et **les
@@ -226,8 +227,22 @@ disponible » alors que rien n'est réellement indisponible.
 **Valeur à définir sur Railway pour l'année 2026-2027 :**
 
 ```
-ANNEE_SCOLAIRE_DEBUT=2026-09-05
+ANNEE_SCOLAIRE_DEBUT=2026-09-07
 ```
+
+> ⚠️ Si la variable vaut encore `2026-09-05` dans l'environnement Railway, elle
+> **prime sur le code** et la correction du dépôt n'aura aucun effet visible.
+> Elle doit être remplacée explicitement.
+
+**Pourquoi un lundi.** Les semaines sont des blocs de sept jours à partir de la
+date de rentrée. Une rentrée tombant un samedi décalait les ouvertures de blocs
+d'un samedi ; avec une rentrée un lundi, chaque ouverture tombe un lundi :
+
+| Bloc | Semaine | Ouverture avec une rentrée au 07/09/2026 |
+|---|---|---|
+| B1 — Calcul littéral | S1 | lundi 7 septembre 2026 |
+| B2 — Racines carrées | S5 | lundi 5 octobre 2026 |
+| B3 — Calcul numérique | S10 | lundi 9 novembre 2026 |
 
 Pour changer d'année scolaire, cette variable suffit : le code ne nécessite
 aucun redéploiement.
