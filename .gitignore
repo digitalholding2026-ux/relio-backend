@@ -1,0 +1,37 @@
+# Secrets — ne JAMAIS commiter
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+credentials.json
+.netrc
+
+# Dépendances
+node_modules/
+.venv/
+venv/
+
+# Build / cache
+dist/
+build/
+.next/
+out/
+coverage/
+*.tsbuildinfo
+__pycache__/
+*.pyc
+
+# Tests
+coverage/
+.playwright/
+
+# Fichiers temporaires
+/tmp/
+*.bak
+*.log
+
+# Editeurs / OS
+.DS_Store
+.idea/
+.vscode/
