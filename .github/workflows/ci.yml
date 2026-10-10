@@ -1,0 +1,146 @@
+name: CI
+
+# Verification statique et tests uniquement.
+# Aucun deploiement automatique : Vercel et Railway gerent les leurs.
+# Aucun secret n'est necessaire : toutes les etapes sont publiques.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  NEXT_TELEMETRY_DISABLED: '1'
+
+jobs:
+  verify:
+    name: Typecheck, tests et build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Recuperer le code
+        uses: actions/checkout@v4
+
+      # Node 22 : une dependance transitive (cookie@2.0.1) exige >= 22.
+      - name: Installer Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      # Installation reproductible a partir du lockfile.
+      - name: Installer les dependances
+        run: npm ci
+
+      - name: Verification des types
+        run: npm run typecheck
+
+      - name: Tests automatises
+        run: npm test
+
+      - name: Build de production
+        run: npm run build
+
+  audit:
+    name: Audit de dependances (informatif)
+    runs-on: ubuntu-latest
+    # Ne bloque pas la fusion : le resultat est publie, la decision reste humaine.
+    continue-on-error: true
+
+    steps:
+      - name: Recuperer le code
+        uses: actions/checkout@v4
+
+      - name: Installer Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Installer les dependances
+        run: npm ci
+
+      - name: Audit npm
+        run: npm audit --audit-level=high
+```
+
+### 2.2 `relio-frontend/.github/workflows/ci.yml`
+
+**Identique au précédent**, à une seule différence : le nom du job `verify`
+précise la technologie.
+
+```yaml
+name: CI
+
+# Verification statique et tests uniquement.
+# Aucun deploiement automatique : Vercel et Railway gerent les leurs.
+# Aucun secret n'est necessaire : toutes les etapes sont publiques.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  NEXT_TELEMETRY_DISABLED: '1'
+
+jobs:
+  verify:
+    name: Typecheck, tests et build (Next.js)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Recuperer le code
+        uses: actions/checkout@v4
+
+      # Node 22 : une dependance transitive (cookie@2.0.1) exige >= 22.
+      - name: Installer Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      # Installation reproductible a partir du lockfile.
+      - name: Installer les dependances
+        run: npm ci
+
+      - name: Verification des types
+        run: npm run typecheck
+
+      - name: Tests automatises
+        run: npm test
+
+      - name: Build de production
+        run: npm run build
+
+  audit:
+    name: Audit de dependances (informatif)
+    runs-on: ubuntu-latest
+    # Ne bloque pas la fusion : le resultat est publie, la decision reste humaine.
+    continue-on-error: true
+
+    steps:
+      - name: Recuperer le code
+        uses: actions/checkout@v4
+
+      - name: Installer Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Installer les dependances
+        run: npm ci
+
+      - name: Audit npm
+        run: npm audit --audit-level=high
