@@ -35,7 +35,10 @@ beforeEach(async () => {
 });
 
 afterEach(async () => {
+  // Les deux variables pilotent le calendrier : elles ne doivent jamais
+  // survivre à un test, sous peine de contaminer le suivant.
   delete process.env.DATE_NAVIGATION_TEST;
+  delete process.env.ANNEE_SCOLAIRE_DEBUT;
   await app.close();
 });
 
@@ -293,6 +296,109 @@ describe('POST /api/v1/corrections', () => {
       const reponse = await app.inject(requete);
       assert.equal(reponse.statusCode, 403, `${requete.method} ${requete.url}`);
     }
+  });
+});
+
+describe('année scolaire 2026-2027 — configuration et protection des blocs', () => {
+  // Le helper `forcerSemaine` de ce fichier ancre la date sur
+  // `DEBUT_ANNEE_DEFAUT`, qui vaut désormais 2026-09-05. Ces tests vérifient
+  // que l'API lit bien la variable d'environnement, et que le garde-fou
+  // calendrier tient sur l'année réellement en cours.
+
+  it('expose la date de début configurée dans la réponse', async () => {
+    forcerSemaine(1);
+    const corps = (await app.inject({ method: 'GET', url: '/api/v1/parcours' })).json();
+    assert.equal(corps.anneeScolaire.debut, '2026-09-05');
+  });
+
+  it('suit la variable ANNEE_SCOLAIRE_DEBUT lorsqu’elle est définie', async () => {
+    forcerSemaine(1);
+    // Une année antérieure doit être prise en compte : c'est le scénario qui
+    // a produit l'incident du chantier 7.1.
+    process.env.ANNEE_SCOLAIRE_DEBUT = '2026-09-05';
+    const annee2026 = (await app.inject({ method: 'GET', url: '/api/v1/parcours' })).json();
+    assert.equal(annee2026.anneeScolaire.debut, '2026-09-05');
+    assert.equal(annee2026.anneeScolaire.dansAnneeScolaire, true);
+    assert.ok(
+      annee2026.blocs.find((b: { id: string }) => b.id === 'B1').disponible,
+      'B1 doit être ouvert en semaine 1 de l’année configurée.',
+    );
+
+    delete process.env.ANNEE_SCOLAIRE_DEBUT;
+  });
+
+  it('retombe sur le défaut quand la variable est absente', async () => {
+    delete process.env.ANNEE_SCOLAIRE_DEBUT;
+    forcerSemaine(1);
+    const corps = (await app.inject({ method: 'GET', url: '/api/v1/parcours' })).json();
+    assert.equal(corps.anneeScolaire.debut, DEBUT_ANNEE_DEFAUT);
+  });
+
+  it('ouvre les trois blocs aux semaines 1, 5 et 10 de 2026-2027', async () => {
+    forcerSemaine(1);
+    const s1 = (await app.inject({ method: 'GET', url: '/api/v1/parcours' })).json();
+    assert.deepEqual(
+      s1.blocs.filter((b: { disponible: boolean }) => b.disponible).map((b: { id: string }) => b.id),
+      ['B1'],
+    );
+
+    forcerSemaine(5);
+    const s5 = (await app.inject({ method: 'GET', url: '/api/v1/parcours' })).json();
+    assert.deepEqual(
+      s5.blocs.filter((b: { disponible: boolean }) => b.disponible).map((b: { id: string }) => b.id),
+      ['B1', 'B2'],
+    );
+
+    forcerSemaine(10);
+    const s10 = (await app.inject({ method: 'GET', url: '/api/v1/parcours' })).json();
+    assert.deepEqual(
+      s10.blocs.filter((b: { disponible: boolean }) => b.disponible).map((b: { id: string }) => b.id),
+      ['B1', 'B2', 'B3'],
+    );
+  });
+
+  it('refuse énoncé, indice et correction d’un bloc fermé, en 2026-2027', async () => {
+    forcerSemaine(1); // semaine 1 : seuls B1 est ouvert
+
+    // B3 ouvre en semaine 10 : tout son contenu doit être refusé.
+    for (const requete of [
+      { method: 'GET' as const, url: '/api/v1/exercices/MVP-B3-E1' },
+      { method: 'GET' as const, url: '/api/v1/exercices/MVP-B3-E1/indice/1' },
+      { method: 'GET' as const, url: '/api/v1/exercices/MVP-B2-E1/indice/2' },
+      {
+        method: 'POST' as const,
+        url: '/api/v1/corrections',
+        payload: { exerciceId: 'MVP-B3-E1', reponse: '1/8' },
+      },
+      {
+        method: 'POST' as const,
+        url: '/api/v1/progression',
+        payload: { reponses: [{ exerciceId: 'MVP-B2-E1', statut: 'fausse' }] },
+      },
+    ]) {
+      const reponse = await app.inject(requete);
+      assert.equal(reponse.statusCode, 403, `${requete.method} ${requete.url}`);
+    }
+
+    // B1 est ouvert : le même exercice est accessible.
+    const ouvert = await app.inject({ method: 'GET', url: '/api/v1/exercices/MVP-B1-E1' });
+    assert.equal(ouvert.statusCode, 200);
+  });
+
+  it('laisse corriger et donner un indice dans un bloc ouvert', async () => {
+    forcerSemaine(10); // B3 ouvert
+
+    const indice = await app.inject({ method: 'GET', url: '/api/v1/exercices/MVP-B3-E1/indice/1' });
+    assert.equal(indice.statusCode, 200);
+    assert.ok(indice.json().texte.length > 0);
+
+    const correction = await app.inject({
+      method: 'POST',
+      url: '/api/v1/corrections',
+      payload: { exerciceId: 'MVP-B3-E1', reponse: '1/8' },
+    });
+    assert.equal(correction.statusCode, 200);
+    assert.equal(correction.json().statut, 'correcte');
   });
 });
 

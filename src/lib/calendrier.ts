@@ -9,11 +9,11 @@
  * `data/referentiel-maths-3e-cm-2025-2026.json` (sha256 `f766f412…`) :
  * L1 → S1, L3 → S5, L5 → S10. Aucune semaine n'est inventée ici.
  *
- * ⚠️ Le référentiel donne des **mois**, pas des dates de jour : le premier
- * septembre est une approximation documentée, et elle est **configurable** par
- * `ANNEE_SCOLAIRE_DEBUT`. En dehors de l'année scolaire, aucun bloc n'est
- * ouvert — l'application affiche alors un message explicite plutôt qu'un
- * parcours vide sans explication.
+ * Le jour de début est une **décision projet** (le référentiel ne donne qu'un
+ * mois), configurable par `ANNEE_SCOLAIRE_DEBUT` pour être ajustée sans
+ * redéploiement. En dehors de l'année scolaire, aucun bloc n'est ouvert —
+ * l'application affiche alors un message explicite plutôt qu'un parcours vide
+ * sans explication.
  */
 
 export interface PositionDansLAnnee {
@@ -28,10 +28,28 @@ export interface PositionDansLAnnee {
 export const NOMBRE_SEMAINES = 30;
 
 /**
- * Premier jour de la première semaine de cours de l'année 2025-2026.
- * Approximation : le référentiel indique « Septembre » sans jour exact.
+ * Premier jour de la première semaine de cours de l'année scolaire en cours.
+ *
+ * Valeur retenue par le propriétaire de Relio pour l'année **2026-2027** :
+ * le 5 septembre 2026.
+ *
+ * Deux précautions :
+ *
+ * - le référentiel annuel `data/referentiel-maths-3e-cm-2025-2026.json` donne
+ *   des **mois**, pas des jours. Le 5 septembre est donc une décision
+ *   projet, pas une donnée extraite du document source ;
+ * - cette valeur est le **repli** utilisé quand `ANNEE_SCOLAIRE_DEBUT` est
+ *   absente. La valeur définie en production reste prioritaire, car elle permet de
+ *   changer d'année scolaire sans redéploiement.
+ *
+ * ⚠️ Une valeur périmée n'est pas anodine : avec une année antérieure, toute
+ * date située après la fin de cette année-là est déclarée « année terminée »,
+ * et **tous les blocs se referment** — y compris B1, prévu dès la semaine 1.
+ * Une application de rentrée affichant « aucune leçon disponible » sans que
+ * rien ne soit réellement indisponible est un défaut d'outillage, pas un
+ * état pédagogique. C'est pourquoi le défaut est vérifié par un test.
  */
-export const DEBUT_ANNEE_DEFAUT = '2025-09-01';
+export const DEBUT_ANNEE_DEFAUT = '2026-09-05';
 
 const MS_PAR_JOUR = 24 * 60 * 60 * 1000;
 

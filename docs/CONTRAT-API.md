@@ -206,12 +206,35 @@ sans réponse réelle.
 
 | Variable | Défaut | Rôle |
 |---|---|---|
-| `ANNEE_SCOLAIRE_DEBUT` | `2025-09-01` | Premier jour de la semaine 1. Le référentiel annuel donne le mois, pas le jour : cette date est une approximation documentée, et elle se règle sans redéploiement du code. |
+| `ANNEE_SCOLAIRE_DEBUT` | `2026-09-05` | Premier jour de la semaine 1. **Année scolaire 2026-2027**, date retenue par le propriétaire. Le référentiel annuel donne le mois, pas le jour : cette date est une décision projet, et elle se règle sans redéploiement du code. **À définir explicitement sur Railway** — voir § 11. |
 | `DATE_NAVIGATION_TEST` | *(absente)* | Force la date courante. **Usage de test uniquement** — ne pas définir en production. |
 
 ---
 
-## 11. Points laissés ouverts (chantier 7)
+## 11. Année scolaire — action requise sur Railway
+
+Le calendrier dépend de `ANNEE_SCOLAIRE_DEBUT`. **Elle doit être définie
+explicitement sur Railway**, même si elle est identiques au défaut du code.
+
+Une valeur absente ou périmée n'est pas anodine : toute date située après la fin
+de l'année scolaire correspondante est déclarée « année terminée », et **les
+trois blocs se referment** — y compris B1, prévu dès la semaine 1. L'API
+continue de répondre 200, avec un message explicite et une liste vide
+d'exercices : rien n'indique une panne, et un élève voit « aucune leçon
+disponible » alors que rien n'est réellement indisponible.
+
+**Valeur à définir sur Railway pour l'année 2026-2027 :**
+
+```
+ANNEE_SCOLAIRE_DEBUT=2026-09-05
+```
+
+Pour changer d'année scolaire, cette variable suffit : le code ne nécessite
+aucun redéploiement.
+
+---
+
+## 12. Points laissés ouverts (chantier 7)
 
 Ces points ne sont pas tranchés : le code les signale plutôt que de décider.
 
